@@ -1,0 +1,41 @@
+server:
+  port: ${PORT:8080}
+
+logging:
+  level:
+    org.atmosphere: WARN
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+
+vaadin:
+  launch-browser: true
+  allowed-packages: com.vaadin, org.vaadin, com.flowingcode, kz.moon.app
+
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/ml_mng_db
+    username: cobra
+    password: cobra
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update # можно также: none / update / validate / create-drop — если Liquibase работает — лучше validate
+    open-in-view: false
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+
+  liquibase:
+    enabled: true
+    change-log: classpath:/db/changelog/db.changelog-master.yaml
+
+# Actuator endpoints — можно включить для мониторинга
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
