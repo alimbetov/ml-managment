@@ -19,11 +19,6 @@ import jakarta.annotation.security.PermitAll;
 import kz.moon.app.config.UserPrincipal;
 import kz.moon.app.seclevel.domain.RolesEnum;
 import kz.moon.app.seclevel.utils.SecurityUtils;
-import kz.moon.app.taskmanagement.ui.view.TaskListView;
-import kz.moon.app.seclevel.ui.view.AdminView;
-import kz.moon.app.seclevel.ui.view.MarkingView;
-import kz.moon.app.seclevel.ui.view.AuditView;
-import kz.moon.app.seclevel.ui.view.ExpertToolsView;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 
@@ -41,7 +36,6 @@ public final class MainLayout extends AppLayout {
         Component userMenu = createUserMenu();
         Button logoutButton = createLogoutButton();
 
-        // Добавляем в "боковую панель":
         VerticalLayout drawerContent = new VerticalLayout(header, sideNav, logoutButton);
         drawerContent.setPadding(false);
         drawerContent.setSpacing(false);
@@ -53,52 +47,68 @@ public final class MainLayout extends AppLayout {
     }
 
     private Div createHeader() {
-        var appLogo = VaadinIcon.CUBES.create();
+        Icon appLogo = VaadinIcon.CUBES.create();
         appLogo.addClassNames(TextColor.PRIMARY, IconSize.LARGE);
 
-        var appName = new Span("ML Annotation Tracker");
+        Span appName = new Span("ML Annotation Tracker");
         appName.addClassNames(FontWeight.SEMIBOLD, FontSize.LARGE);
 
-        var header = new Div(appLogo, appName);
+        Div header = new Div(appLogo, appName);
         header.addClassNames(Display.FLEX, Padding.MEDIUM, Gap.MEDIUM, AlignItems.CENTER);
         return header;
     }
 
     private SideNav createSideNav() {
-        var nav = new SideNav();
+        SideNav nav = new SideNav();
         nav.addClassNames(Margin.Horizontal.MEDIUM);
 
-        // Всегда доступно
-        nav.addItem(new SideNavItem("Task List", "task-list", VaadinIcon.CLIPBOARD_CHECK.create()));
-        // Только для ROLE_EXPERT
-        if (SecurityUtils.hasRole(RolesEnum.ROLE_USER)) {
-            nav.addItem(new SideNavItem("Expert Tools", "expert", VaadinIcon.TOOLS.create()));
-        }
-        // Только для ROLE_ADMIN
-        if (SecurityUtils.hasRole(RolesEnum.ROLE_ADMIN)) {
-            nav.addItem(new SideNavItem("Admin Panel", "admin", VaadinIcon.COG.create()));
-        }
-
-        // Только для ROLE_MARKER
-        if (SecurityUtils.hasRole(RolesEnum.ROLE_MARKER)) {
-            nav.addItem(new SideNavItem("Marking Tasks", "marker", VaadinIcon.EDIT.create()));
-        }
-
-        // Только для ROLE_AUDIT
-        if (SecurityUtils.hasRole(RolesEnum.ROLE_AUDIT)) {
-            nav.addItem(new SideNavItem("Audit Panel", "audit", VaadinIcon.SEARCH.create()));
-        }
-
-        // Только для ROLE_EXPERT
-        if (SecurityUtils.hasRole(RolesEnum.ROLE_EXPERT)) {
-            nav.addItem(new SideNavItem("Expert Tools", "expert", VaadinIcon.TOOLS.create()));
-        }
+        // Страницы — централизованно
+        addAlwaysVisible(nav);
+        addAdminPages(nav);
+        addExpertPages(nav);
+        addMarkerPages(nav);
+        addAuditPages(nav);
 
         return nav;
     }
 
+    private void addAlwaysVisible(SideNav nav) {
+        nav.addItem(new SideNavItem("Task List", "task-list", VaadinIcon.CLIPBOARD_CHECK.create()));
+
+        // Добавляем основные страницы
+        nav.addItem(new SideNavItem("Projects", "project-list", VaadinIcon.PACKAGE.create()));
+        nav.addItem(new SideNavItem("Classifiers", "classifier-list", VaadinIcon.LAYOUT.create()));
+        nav.addItem(new SideNavItem("Categories", "category-list", VaadinIcon.TAGS.create()));
+        nav.addItem(new SideNavItem("Images", "image-list", VaadinIcon.PICTURE.create()));
+        nav.addItem(new SideNavItem("Annotations", "annotation-list", VaadinIcon.FILE_TEXT.create()));
+        nav.addItem(new SideNavItem("Assignments", "assignment-list", VaadinIcon.USERS.create()));
+    }
+
+    private void addAdminPages(SideNav nav) {
+        if (SecurityUtils.hasRole(RolesEnum.ROLE_ADMIN)) {
+            nav.addItem(new SideNavItem("Admin Panel", "admin", VaadinIcon.COG.create()));
+        }
+    }
+
+    private void addExpertPages(SideNav nav) {
+        if (SecurityUtils.hasRole(RolesEnum.ROLE_EXPERT)) {
+            nav.addItem(new SideNavItem("Expert Tools", "expert", VaadinIcon.TOOLS.create()));
+        }
+    }
+
+    private void addMarkerPages(SideNav nav) {
+        if (SecurityUtils.hasRole(RolesEnum.ROLE_MARKER)) {
+            nav.addItem(new SideNavItem("Marking Tasks", "marker", VaadinIcon.EDIT.create()));
+        }
+    }
+
+    private void addAuditPages(SideNav nav) {
+        if (SecurityUtils.hasRole(RolesEnum.ROLE_AUDIT)) {
+            nav.addItem(new SideNavItem("Audit Panel", "audit", VaadinIcon.SEARCH.create()));
+        }
+    }
+
     private Component createUserMenu() {
-        // Получаем текущего пользователя
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
         String displayName = "Unknown";
@@ -116,13 +126,12 @@ public final class MainLayout extends AppLayout {
                     .orElse("No Roles");
         }
 
-        // Теперь создаём Avatar и Menu
-        var avatar = new Avatar(displayName);
+        Avatar avatar = new Avatar(displayName);
         avatar.addThemeVariants(AvatarVariant.LUMO_XSMALL);
         avatar.addClassNames(Margin.Right.SMALL);
         avatar.setColorIndex(5);
 
-        var userMenu = new MenuBar();
+        MenuBar userMenu = new MenuBar();
         userMenu.addThemeVariants(MenuBarVariant.LUMO_TERTIARY_INLINE);
         userMenu.addClassNames(Margin.MEDIUM);
 
@@ -137,6 +146,7 @@ public final class MainLayout extends AppLayout {
 
         return userMenu;
     }
+
     private Button createLogoutButton() {
         Button logoutBtn = new Button("Logout", event -> {
             getUI().ifPresent(ui -> ui.getPage().setLocation("/logout"));
