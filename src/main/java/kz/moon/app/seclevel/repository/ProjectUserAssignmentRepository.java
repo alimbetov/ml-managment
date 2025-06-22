@@ -1,11 +1,17 @@
 package kz.moon.app.seclevel.repository;
 
 
+import kz.moon.app.seclevel.domain.User;
+import kz.moon.app.seclevel.model.Project;
 import kz.moon.app.seclevel.model.ProjectUserAssignment;
 
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import java.util.List;
 
 public interface ProjectUserAssignmentRepository extends JpaRepository<ProjectUserAssignment, Long> {
 
@@ -20,4 +26,20 @@ public interface ProjectUserAssignmentRepository extends JpaRepository<ProjectUs
 
     // Подсчет с фильтром по имени пользователя
     long countByUser_UsernameContainingIgnoreCase(String username);
+
+    @Query("""
+        select distinct pua.user
+        from ProjectUserAssignment pua
+        where pua.project in :projects
+        """)
+    List<User> findDistinctUsersByProjectIn(@Param("projects") List<Project> projects);
+
+    @Query("""
+        select distinct pua.project
+        from ProjectUserAssignment pua
+        where pua.project in :projects
+        """)
+    List<Project> findDistinctProjectsIn(@Param("projects") List<Project> projects);
+
+
 }

@@ -65,6 +65,13 @@ public class ProjectUserAssignmentService {
         return assignmentRepository.save(assignment);
     }
 
+    public  List<User> getUsersByProjectIn( List<Project> projects) {
+       return assignmentRepository.findDistinctUsersByProjectIn(projects);
+    }
+    public  List<Project> getProjectsList( List<Project> projects) {
+        return assignmentRepository.findDistinctProjectsIn(projects);
+    }
+
     public void deleteAssignment(Long assignmentId) {
         assignmentRepository.deleteById(assignmentId);
     }

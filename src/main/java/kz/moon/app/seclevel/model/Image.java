@@ -23,8 +23,8 @@ public class Image {
     @EqualsAndHashCode.Include // <= включаем только id в hashCode
     private Long id;
 
-    private String filename; // путь/имя файла
-    private String fileHash; // хэш файла (чтобы избежать дублей)
+    private String filename;
+    private String fileHash;
 
     @ManyToOne
     private Project project;
@@ -36,6 +36,18 @@ public class Image {
 
     @Enumerated(EnumType.STRING)
     private ImageStatus status; // Статус: загружен, размечен, проверен
+
+
+    // === Привязка к оригинальному изображению ===
+    @ManyToOne
+    @JoinColumn(name = "parent_image_id")
+    private Image parentImage;
+
+    private String parentFilename;
+
+    // === Привязка к категории ===
+    @ManyToOne
+    private ClassifierCategory classifierCategory;
 
     @OneToMany(mappedBy = "image", cascade = CascadeType.ALL)
     private Set<ImageAnnotation> annotations;

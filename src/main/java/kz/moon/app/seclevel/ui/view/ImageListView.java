@@ -1,13 +1,15 @@
 package kz.moon.app.seclevel.ui.view;
 
-
+import com.vaadin.flow.component.datepicker.DatePicker;
 import com.vaadin.flow.component.upload.Upload;
 import com.vaadin.flow.component.upload.receivers.MemoryBuffer;
+import kz.moon.app.seclevel.domain.User;
 import kz.moon.app.seclevel.model.Image;
 import kz.moon.app.seclevel.model.Project;
 import kz.moon.app.seclevel.repository.ImageStatus;
 import kz.moon.app.seclevel.services.ImageService;
 import kz.moon.app.seclevel.services.ProjectService;
+import kz.moon.app.seclevel.services.ProjectUserAssignmentService;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.dialog.Dialog;
@@ -15,7 +17,6 @@ import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.html.Main;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.component.combobox.ComboBox;
-import com.vaadin.flow.component.select.Select;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.notification.NotificationVariant;
@@ -26,81 +27,77 @@ import com.vaadin.flow.data.provider.DataProvider;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.router.PageTitle;
 import jakarta.annotation.security.PermitAll;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.annotation.Secured;
-
-import java.util.ArrayList;
-import java.util.Optional;
 import java.util.List;
+import java.util.Optional;
 
 @Secured({"ROLE_USER", "ROLE_MANAGER", "ROLE_ADMIN"})
 @Route("image-list")
 @PageTitle("Images")
 @PermitAll
+@Slf4j
 public class ImageListView extends Main {
 
     private final ImageService imageService;
     private final ProjectService projectService;
+    private final ProjectUserAssignmentService assignmentService;
 
-    private final TextField filenameField;
-    private final ComboBox<Project> projectCombo;
-    private final Button createBtn;
+    private final ComboBox<Project> projectFilter;
+    private final ComboBox<ImageStatus> statusFilter;
+    private final ComboBox<User> authorFilter;
+    private final DatePicker uploadDateFilter;
 
-    private Button openUploadDialogBtn;
+    private final Button openUploadDialogBtn;
 
-    private final TextField filterField;
     private final Grid<Image> imageGrid = new Grid<>(Image.class, false);
 
-    private final  List<ImageStatus> imageStatusList = List.of(
+    private final List<ImageStatus> imageStatusList = List.of(
             ImageStatus.UPLOADED,
             ImageStatus.IN_PROGRESS,
             ImageStatus.MARKED,
             ImageStatus.REJECTED,
             ImageStatus.REVIEWED,
             ImageStatus.APPROVED
-            );
+    );
 
-
-    public ImageListView(ImageService imageService, ProjectService projectService) {
+    public ImageListView(ImageService imageService, ProjectService projectService, ProjectUserAssignmentService projectUserAssignmentService) {
         this.imageService = imageService;
         this.projectService = projectService;
+        this.assignmentService = projectUserAssignmentService;
+        var projectList = assignmentService.getProjectsList(projectService.findAllProjects());
 
-        filenameField = new TextField();
-        filenameField.setPlaceholder("Filename");
-        projectCombo = new ComboBox<>("Project");
-        List<Project> projects = projectService.findAllProjects();
-        projectCombo.setItems(projects);
-        projectCombo.setItemLabelGenerator(Project::getName);
-        projectCombo.setPlaceholder("Select project");
+        projectFilter = new ComboBox<>("Project");
+        projectFilter.setItems(projectList);
+        projectFilter.setItemLabelGenerator(Project::getName);
+        projectFilter.addValueChangeListener(e -> imageGrid.getDataProvider().refreshAll());
 
-        createBtn = new Button("Upload", event -> createImage());
-        createBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+        statusFilter = new ComboBox<>("Status", imageStatusList);
+        statusFilter.addValueChangeListener(e -> imageGrid.getDataProvider().refreshAll());
 
+        authorFilter = new ComboBox<>("Author");
+        authorFilter.setItems(assignmentService.getUsersByProjectIn(projectList));
+        authorFilter.setItemLabelGenerator(User::getUsername);
+        authorFilter.addValueChangeListener(e -> imageGrid.getDataProvider().refreshAll());
 
+        uploadDateFilter = new DatePicker("Upload Date");
+        uploadDateFilter.addValueChangeListener(e -> imageGrid.getDataProvider().refreshAll());
 
-
-        filterField = new TextField();
-        filterField.setPlaceholder("Filter by filename...");
-        filterField.setClearButtonVisible(true);
-        filterField.setWidthFull();
-        filterField.addValueChangeListener(e -> imageGrid.getDataProvider().refreshAll());
-
-
-
+        openUploadDialogBtn = new Button("Upload Image", click -> openUploadDialogWithFile());
+        openUploadDialogBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
 
         configureGrid();
         setupDataProvider();
 
         setSizeFull();
 
-        openUploadDialogBtn = new Button("Upload New Image", click -> openUploadDialogWithFile());
-        openUploadDialogBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
-
-
         add(new kz.moon.app.base.ui.component.ViewToolbar("Image List",
-                kz.moon.app.base.ui.component.ViewToolbar.group(filenameField, projectCombo, createBtn,openUploadDialogBtn)));
-        add(filterField);
+                kz.moon.app.base.ui.component.ViewToolbar.group(
+                        projectFilter, statusFilter, authorFilter, uploadDateFilter, openUploadDialogBtn
+                )));
         add(imageGrid);
     }
+
 
     private void configureGrid() {
         imageGrid.addColumn(Image::getFilename)
@@ -112,7 +109,7 @@ public class ImageListView extends Main {
                 .setHeader("Project")
                 .setAutoWidth(true);
         imageGrid.addColumn(image -> Optional.ofNullable(image.getUploadedBy())
-                        .map(user -> user.getUsername()).orElse(""))
+                        .map(User::getUsername).orElse(""))
                 .setHeader("Uploaded By")
                 .setAutoWidth(true);
         imageGrid.addColumn(image -> image.getUploadDate().toString())
@@ -131,10 +128,9 @@ public class ImageListView extends Main {
             return new HorizontalLayout(editButton, deleteButton);
         }).setHeader("Actions");
 
-        imageGrid.setPageSize(10);
+        imageGrid.setPageSize(25);
         imageGrid.setSizeFull();
     }
-
     private void setupDataProvider() {
         CallbackDataProvider<Image, Void> dataProvider = DataProvider.fromCallbacks(
                 query -> {
@@ -145,27 +141,24 @@ public class ImageListView extends Main {
                     boolean asc = query.getSortOrders().isEmpty()
                             || query.getSortOrders().get(0).getDirection()
                             == com.vaadin.flow.data.provider.SortDirection.ASCENDING;
-                    return imageService.find(filterField.getValue(), offset, limit, sortBy, asc).stream();
+
+                    return imageService.find(
+                            projectFilter.getValue(),
+                            statusFilter.getValue(),
+                            authorFilter.getValue(),
+                            uploadDateFilter.getValue(),
+                            offset, limit, sortBy, asc
+                    ).stream();
                 },
-                query -> (int) imageService.count(filterField.getValue())
+                query -> (int) imageService.count(
+                        projectFilter.getValue(),
+                        statusFilter.getValue(),
+                        authorFilter.getValue(),
+                        uploadDateFilter.getValue()
+                )
         );
         imageGrid.setDataProvider(dataProvider);
     }
-
-    private void createImage() {
-        if (projectCombo.getValue() != null) {
-            imageService.createImage(filenameField.getValue(), projectCombo.getValue().getId());
-            imageGrid.getDataProvider().refreshAll();
-            filenameField.clear();
-            projectCombo.clear();
-            Notification.show("Image uploaded", 3000, Notification.Position.BOTTOM_END)
-                    .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
-        } else {
-            Notification.show("Select a project for the image", 3000, Notification.Position.MIDDLE)
-                    .addThemeVariants(NotificationVariant.LUMO_ERROR);
-        }
-    }
-
     private void editImage(Image image) {
         Dialog dialog = new Dialog();
         dialog.setHeaderTitle("Edit Image");
@@ -177,7 +170,6 @@ public class ImageListView extends Main {
         projectField.setItemLabelGenerator(Project::getName);
         projectField.setValue(image.getProject());
         ComboBox<ImageStatus> statusField = new ComboBox<>("Status", imageStatusList);
-        statusField.setLabel("Status");
         statusField.setValue(image.getStatus());
 
         Button saveButton = new Button("Save", event -> {
@@ -197,8 +189,6 @@ public class ImageListView extends Main {
         dialog.add(new VerticalLayout(filenameField, projectField, statusField, buttons));
         dialog.open();
     }
-
-
 
     private void deleteImage(Image image) {
         Dialog confirmDialog = new Dialog();
@@ -228,20 +218,15 @@ public class ImageListView extends Main {
         dialog.setCloseOnEsc(true);
         dialog.setCloseOnOutsideClick(true);
 
-        // Project selection
         ComboBox<Project> projectField = new ComboBox<>("Project", projectService.findAllProjects());
         projectField.setItemLabelGenerator(Project::getName);
-        projectField.setPlaceholder("Select project");
 
-        // Upload component - MemoryBuffer will store file in memory
         MemoryBuffer buffer = new MemoryBuffer();
         Upload upload = new Upload(buffer);
-
         upload.setAcceptedFileTypes("image/jpeg", "image/png");
 
         upload.addSucceededListener(event -> {
             String filename = event.getFileName();
-
             if (projectField.getValue() == null) {
                 Notification.show("Please select project first!", 3000, Notification.Position.MIDDLE)
                         .addThemeVariants(NotificationVariant.LUMO_ERROR);
@@ -249,7 +234,6 @@ public class ImageListView extends Main {
             }
 
             try (var inputStream = buffer.getInputStream()) {
-                // Пример — ты можешь тут сохранить в БД или в FileSystem
                 imageService.saveUploadedFile(filename, projectField.getValue().getId(), inputStream);
                 imageGrid.getDataProvider().refreshAll();
                 Notification.show("Image " + filename + " uploaded!", 3000, Notification.Position.BOTTOM_END)
@@ -267,6 +251,4 @@ public class ImageListView extends Main {
         dialog.add(new VerticalLayout(projectField, upload, closeBtn));
         dialog.open();
     }
-
 }
-

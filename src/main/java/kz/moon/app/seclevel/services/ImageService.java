@@ -1,7 +1,10 @@
 package kz.moon.app.seclevel.services;
 
-
+import jakarta.annotation.Nullable;
+import jakarta.validation.constraints.NotNull;
+import kz.moon.app.seclevel.domain.User;
 import kz.moon.app.seclevel.model.Image;
+import kz.moon.app.seclevel.repository.ClassifierCategoryRepository;
 import kz.moon.app.seclevel.repository.ImageStatus;
 import kz.moon.app.seclevel.model.Project;
 import kz.moon.app.seclevel.repository.ImageRepository;
@@ -10,12 +13,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 
-import java.io.IOException;
 import java.io.InputStream;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 
 @Service
@@ -23,50 +25,85 @@ public class ImageService {
 
     private final ImageRepository imageRepository;
     private final ProjectRepository projectRepository;
-
     private final MyUserDetailsService userDetailsService;
+    private final ClassifierCategoryRepository classifierCategoryRepository;
+
     public ImageService(ImageRepository imageRepository,
                         ProjectRepository projectRepository,
+                        ClassifierCategoryRepository classifierCategoryRepository,
                         MyUserDetailsService userDetailsService) {
         this.imageRepository = imageRepository;
         this.projectRepository = projectRepository;
+        this.classifierCategoryRepository = classifierCategoryRepository;
         this.userDetailsService = userDetailsService;
     }
 
-    public List<Image> find(String filenameFilter, int offset, int limit, String sortBy, boolean asc) {
+    public List<Image> find(int offset, int limit, String sortBy, boolean asc) {
         Pageable pageable = PageRequest.of(offset / limit, limit,
                 asc ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending());
-        if (filenameFilter == null || filenameFilter.isEmpty()) {
-            return imageRepository.findAllBy(pageable).getContent();
-        } else {
-            return imageRepository.findByFilenameContainingIgnoreCase(filenameFilter, pageable).getContent();
-        }
+        return imageRepository.findAllBy(pageable).getContent();
     }
 
-    public long count(String filenameFilter) {
-        if (filenameFilter == null || filenameFilter.isEmpty()) {
-            return imageRepository.count();
-        } else {
-            return imageRepository.countByFilenameContainingIgnoreCase(filenameFilter);
-        }
+    public long count() {
+        return imageRepository.count();
     }
 
-    public Image createImage(String filename, Long projectId) {
-        Project project = projectRepository.findById(projectId)
-                .orElseThrow(() -> new IllegalArgumentException("Project not found"));
-        Image image = Image.builder()
-                .filename(filename)
-                .fileHash(Integer.toHexString(filename.hashCode())) // simplistic hash
-                .project(project)
-                .uploadDate(Instant.now())
-                .status(ImageStatus.UPLOADED)
-                .build();
-        // Set uploadedBy to current user if available
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth != null && auth.getPrincipal() instanceof kz.moon.app.seclevel.domain.User) {
-            image.setUploadedBy((kz.moon.app.seclevel.domain.User) auth.getPrincipal());
+    public List<Image> find(Project projectFilter,
+                            ImageStatus statusFilter,
+                            User authorFilter,
+                            LocalDate uploadDateFilter,
+                            int offset, int limit, String sortBy, boolean asc) {
+
+        Pageable pageable = PageRequest.of(offset / limit, limit,
+                asc ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending());
+
+        Instant uploadDateFilterStart;
+        Instant uploadDateFilterEnd;
+
+        if (uploadDateFilter != null) {
+            uploadDateFilterStart = uploadDateFilter.atStartOfDay(ZoneId.systemDefault()).toInstant();
+            uploadDateFilterEnd = uploadDateFilter.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant();
+        } else {
+            LocalDate today = LocalDate.now();
+            uploadDateFilterStart = today.minusYears(50).atStartOfDay(ZoneId.systemDefault()).toInstant();
+            uploadDateFilterEnd = today.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant();
         }
-        return imageRepository.save(image);
+
+        return imageRepository.findAllWithFilters(
+                projectFilter,
+                statusFilter,
+                authorFilter,
+                uploadDateFilterStart,
+                uploadDateFilterEnd,
+                pageable
+        ).getContent();
+    }
+
+    public long count(Project projectFilter,
+                      ImageStatus statusFilter,
+                      User authorFilter,
+                      LocalDate uploadDateFilter) {
+
+        Instant uploadDateFilterStart;
+        Instant uploadDateFilterEnd;
+
+        if (uploadDateFilter != null) {
+            uploadDateFilterStart = uploadDateFilter.atStartOfDay(ZoneId.systemDefault()).toInstant();
+            uploadDateFilterEnd = uploadDateFilter.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant();
+        } else {
+            LocalDate today = LocalDate.now();
+            uploadDateFilterStart = today.minusYears(50).atStartOfDay(ZoneId.systemDefault()).toInstant();
+            uploadDateFilterEnd = today.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant();
+        }
+
+
+        return imageRepository.countAllWithFilters(
+                projectFilter,
+                statusFilter,
+                authorFilter,
+                uploadDateFilterStart,
+                uploadDateFilterEnd
+        );
     }
 
     public Image updateImage(Image image) {
@@ -81,40 +118,48 @@ public class ImageService {
         return imageRepository.findAll();
     }
 
-    public void saveUploadedFile2(String filename, Project project, InputStream inputStream) {
-        var image = new Image();
-        image.setUploadDate(Instant.now());
-        image.setFilename(filename);
-        image.setProject(project);
-        image.setStatus(ImageStatus.UPLOADED);
+    public void saveUploadedFile(@NotNull String filename,
+                                 @NotNull Long projectId,
+                                 @NotNull InputStream inputStream) {
+        saveUploadedFile(filename, projectId, inputStream, null, null, null);
+    }
+
+    public void saveUploadedFile(@NotNull String filename,
+                                 @NotNull Long projectId,
+                                 @NotNull InputStream inputStream,
+                                 @Nullable Long parentImageId,
+                                 @Nullable String parentFilename,
+                                 @Nullable Long classifierCategoryId) {
+
+        var project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new IllegalArgumentException("Project not found"));
+
+        var createdBy = userDetailsService.getCurrentUser()
+                .orElseThrow(() -> new IllegalArgumentException("user not found"));
+
+        Image.ImageBuilder builder = Image.builder()
+                .filename(filename)
+                .fileHash(Integer.toHexString(filename.hashCode()))
+                .project(project)
+                .uploadDate(Instant.now())
+                .status(ImageStatus.UPLOADED)
+                .uploadedBy(createdBy);
+
+        if (parentImageId != null) {
+            imageRepository.findById(parentImageId).ifPresent(builder::parentImage);
+        }
+        if (parentFilename != null && !parentFilename.isBlank()) {
+            builder.parentFilename(parentFilename);
+        }
+
+        if (classifierCategoryId != null) {
+            builder.classifierCategory(
+                    classifierCategoryRepository.findById(classifierCategoryId)
+                            .orElseThrow(() -> new IllegalArgumentException("ClassifierCategory not found"))
+            );
+        }
+
+        Image image = builder.build();
         updateImage(image);
     }
-
-    public void saveUploadedFile(String filename, Long projectId, InputStream inputStream) {
-        try {
-            var project = projectRepository.findById(projectId)
-                    .orElseThrow(() -> new IllegalArgumentException("Project not found"));
-
-            var createdBy = userDetailsService.getCurrentUser()
-                    .orElseThrow(() -> new IllegalArgumentException("user not found"));
-
-
-            Image image = Image.builder()
-                    .filename(filename)
-                    .fileHash(Integer.toHexString(filename.hashCode())) // simplistic hash
-                    .project(project)
-                    .uploadDate(Instant.now())
-                    .status(ImageStatus.UPLOADED)
-                    .uploadedBy(createdBy)
-                    .build();
-            updateImage(image);
-
-            // Сохраняем Image
-            //updateImage(image);
-
-        } catch (IllegalArgumentException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
 }

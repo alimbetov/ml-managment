@@ -1,22 +1,47 @@
 package kz.moon.app.seclevel.repository;
 
-
+import kz.moon.app.seclevel.domain.User;
 import kz.moon.app.seclevel.model.Image;
+import kz.moon.app.seclevel.model.Project;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import java.time.Instant;
 
 public interface ImageRepository extends JpaRepository<Image, Long> {
 
-    // Пагинация всех изображений
     Slice<Image> findAllBy(Pageable pageable);
 
-    // Фильтрация по имени файла
-    Slice<Image> findByFilenameContainingIgnoreCase(String filename, Pageable pageable);
-
-    // Подсчет всех записей
     long count();
 
-    // Подсчет по фильтру имени файла
-    long countByFilenameContainingIgnoreCase(String filename);
+    @Query("""
+    SELECT i FROM Image i
+    WHERE (:projectFilter IS NULL OR i.project = :projectFilter)
+      AND (:statusFilter IS NULL OR i.status = :statusFilter)
+      AND (:authorFilter IS NULL OR i.uploadedBy = :authorFilter)
+      AND (i.uploadDate >= :uploadDateFilterStart AND i.uploadDate < :uploadDateFilterEnd)
+    
+""")
+    Slice<Image> findAllWithFilters(@Param("projectFilter") Project projectFilter,
+                                    @Param("statusFilter") ImageStatus statusFilter,
+                                    @Param("authorFilter") User authorFilter,
+                                    @Param("uploadDateFilterStart") Instant uploadDateFilterStart,
+                                    @Param("uploadDateFilterEnd") Instant uploadDateFilterEnd,
+                                    Pageable pageable);
+
+    @Query("""
+    SELECT COUNT(i) FROM Image i
+    WHERE (:projectFilter IS NULL OR i.project = :projectFilter)
+      AND (:statusFilter IS NULL OR i.status = :statusFilter)
+      AND (:authorFilter IS NULL OR i.uploadedBy = :authorFilter)
+      AND (i.uploadDate >= :uploadDateFilterStart AND i.uploadDate < :uploadDateFilterEnd)
+""")
+    long countAllWithFilters(@Param("projectFilter") Project projectFilter,
+                             @Param("statusFilter") ImageStatus statusFilter,
+                             @Param("authorFilter") User authorFilter,
+                             @Param("uploadDateFilterStart") Instant uploadDateFilterStart,
+                             @Param("uploadDateFilterEnd") Instant uploadDateFilterEnd);
 }
