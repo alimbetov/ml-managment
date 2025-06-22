@@ -3,9 +3,11 @@ package kz.moon.app.seclevel.services;
 import kz.moon.app.seclevel.model.ImageAnnotation;
 import kz.moon.app.seclevel.model.Image;
 import kz.moon.app.seclevel.model.ClassifierCategory;
+import kz.moon.app.seclevel.model.Project;
 import kz.moon.app.seclevel.repository.ImageAnnotationRepository;
 import kz.moon.app.seclevel.repository.ImageRepository;
 import kz.moon.app.seclevel.repository.ClassifierCategoryRepository;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Service;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.PageRequest;
@@ -28,6 +30,7 @@ public class ImageAnnotationService {
         this.imageRepository = imageRepository;
         this.categoryRepository = categoryRepository;
     }
+
 
     public List<ImageAnnotation> find(String categoryNameFilter, int offset, int limit, String sortBy, boolean asc) {
         Pageable pageable = PageRequest.of(offset / limit, limit,

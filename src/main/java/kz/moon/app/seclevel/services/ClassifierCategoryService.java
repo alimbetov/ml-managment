@@ -2,6 +2,7 @@ package kz.moon.app.seclevel.services;
 
 import kz.moon.app.seclevel.model.ClassifierCategory;
 import kz.moon.app.seclevel.model.Classifier;
+import kz.moon.app.seclevel.model.Project;
 import kz.moon.app.seclevel.repository.ClassifierCategoryRepository;
 import kz.moon.app.seclevel.repository.ClassifierRepository;
 import org.springframework.stereotype.Service;
@@ -63,4 +64,9 @@ public class ClassifierCategoryService {
     public List<ClassifierCategory> findAllCategories() {
         return categoryRepository.findAll();
     }
+
+    public  List<ClassifierCategory> getAllClassifierCategoryByProjectIn(List<Project> projects){
+        return categoryRepository.findAllByProjectIn(projects);
+    }
+
 }

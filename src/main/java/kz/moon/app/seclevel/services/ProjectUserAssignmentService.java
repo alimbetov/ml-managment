@@ -13,6 +13,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -20,14 +21,15 @@ public class ProjectUserAssignmentService {
 
     private final ProjectUserAssignmentRepository assignmentRepository;
     private final ProjectRepository projectRepository;
-    private final UserRepository userRepository;
+
+    private final MyUserDetailsService myUserDetailsService;
 
     public ProjectUserAssignmentService(ProjectUserAssignmentRepository assignmentRepository,
                                         ProjectRepository projectRepository,
-                                        UserRepository userRepository) {
+                                        MyUserDetailsService myUserDetailsService) {
         this.assignmentRepository = assignmentRepository;
         this.projectRepository = projectRepository;
-        this.userRepository = userRepository;
+        this.myUserDetailsService = myUserDetailsService;
     }
 
     public List<ProjectUserAssignment> find(String usernameFilter, int offset, int limit, String sortBy, boolean asc) {
@@ -51,7 +53,7 @@ public class ProjectUserAssignmentService {
     public ProjectUserAssignment createAssignment(Long projectId, Long userId, RolesEnum role) {
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new IllegalArgumentException("Project not found"));
-        User user = userRepository.findById(userId)
+        User user = myUserDetailsService.getUserById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
         ProjectUserAssignment assignment = ProjectUserAssignment.builder()
                 .project(project)
@@ -71,6 +73,18 @@ public class ProjectUserAssignmentService {
     public  List<Project> getProjectsList( List<Project> projects) {
         return assignmentRepository.findDistinctProjectsIn(projects);
     }
+    public  List<Project> getAvailsableProjectsList( ) {
+        var currentUser = myUserDetailsService.getCurrentUser()
+                .orElseThrow(() -> new IllegalArgumentException("user not found"));
+        List<User> userList = new ArrayList<>();
+         if(currentUser!=null) {
+             userList.add(currentUser);
+         }
+        return assignmentRepository.findDistinctUserIn(userList);
+    }
+
+
+
 
     public void deleteAssignment(Long assignmentId) {
         assignmentRepository.deleteById(assignmentId);

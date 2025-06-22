@@ -3,12 +3,14 @@ package kz.moon.app.seclevel.services;
 import jakarta.annotation.Nullable;
 import jakarta.validation.constraints.NotNull;
 import kz.moon.app.seclevel.domain.User;
+import kz.moon.app.seclevel.model.ClassifierCategory;
 import kz.moon.app.seclevel.model.Image;
 import kz.moon.app.seclevel.repository.ClassifierCategoryRepository;
 import kz.moon.app.seclevel.repository.ImageStatus;
 import kz.moon.app.seclevel.model.Project;
 import kz.moon.app.seclevel.repository.ImageRepository;
 import kz.moon.app.seclevel.repository.ProjectRepository;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Service;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.PageRequest;
@@ -51,6 +53,8 @@ public class ImageService {
     public List<Image> find(Project projectFilter,
                             ImageStatus statusFilter,
                             User authorFilter,
+                            Image parentImageFilter,
+                            ClassifierCategory classifierCategoryFilter,
                             LocalDate uploadDateFilter,
                             int offset, int limit, String sortBy, boolean asc) {
 
@@ -73,6 +77,8 @@ public class ImageService {
                 projectFilter,
                 statusFilter,
                 authorFilter,
+                parentImageFilter,
+                classifierCategoryFilter,
                 uploadDateFilterStart,
                 uploadDateFilterEnd,
                 pageable
@@ -82,6 +88,8 @@ public class ImageService {
     public long count(Project projectFilter,
                       ImageStatus statusFilter,
                       User authorFilter,
+                      Image parentImageFilter,
+                      ClassifierCategory classifierCategoryFilter,
                       LocalDate uploadDateFilter) {
 
         Instant uploadDateFilterStart;
@@ -101,6 +109,8 @@ public class ImageService {
                 projectFilter,
                 statusFilter,
                 authorFilter,
+                parentImageFilter,
+                classifierCategoryFilter,
                 uploadDateFilterStart,
                 uploadDateFilterEnd
         );
@@ -162,4 +172,11 @@ public class ImageService {
         Image image = builder.build();
         updateImage(image);
     }
+
+    public List<Image> getParentImages(List<Project> projects){
+       return imageRepository.findImagesWithoutParentByProjects(projects);
+    }
+
+
+
 }

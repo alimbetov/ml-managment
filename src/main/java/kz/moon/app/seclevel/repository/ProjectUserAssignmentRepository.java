@@ -41,5 +41,11 @@ public interface ProjectUserAssignmentRepository extends JpaRepository<ProjectUs
         """)
     List<Project> findDistinctProjectsIn(@Param("projects") List<Project> projects);
 
+    @Query("""
+        select distinct pua.project
+        from ProjectUserAssignment pua
+        where pua.user in :users
+        """)
+    List<Project> findDistinctUserIn(@Param("users") List<User> users);
 
 }

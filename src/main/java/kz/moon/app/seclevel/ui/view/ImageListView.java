@@ -4,9 +4,11 @@ import com.vaadin.flow.component.datepicker.DatePicker;
 import com.vaadin.flow.component.upload.Upload;
 import com.vaadin.flow.component.upload.receivers.MemoryBuffer;
 import kz.moon.app.seclevel.domain.User;
+import kz.moon.app.seclevel.model.ClassifierCategory;
 import kz.moon.app.seclevel.model.Image;
 import kz.moon.app.seclevel.model.Project;
 import kz.moon.app.seclevel.repository.ImageStatus;
+import kz.moon.app.seclevel.services.ClassifierCategoryService;
 import kz.moon.app.seclevel.services.ImageService;
 import kz.moon.app.seclevel.services.ProjectService;
 import kz.moon.app.seclevel.services.ProjectUserAssignmentService;
@@ -29,6 +31,9 @@ import com.vaadin.flow.router.PageTitle;
 import jakarta.annotation.security.PermitAll;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.annotation.Secured;
+
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
 
@@ -43,9 +48,14 @@ public class ImageListView extends Main {
     private final ProjectService projectService;
     private final ProjectUserAssignmentService assignmentService;
 
+    private final ClassifierCategoryService categoryService;
+
     private final ComboBox<Project> projectFilter;
     private final ComboBox<ImageStatus> statusFilter;
     private final ComboBox<User> authorFilter;
+    private final ComboBox<Image> parentImageFilter;
+    private final ComboBox<ClassifierCategory> classifierCategoryFilter;
+
     private final DatePicker uploadDateFilter;
 
     private final Button openUploadDialogBtn;
@@ -61,11 +71,12 @@ public class ImageListView extends Main {
             ImageStatus.APPROVED
     );
 
-    public ImageListView(ImageService imageService, ProjectService projectService, ProjectUserAssignmentService projectUserAssignmentService) {
+    public ImageListView(ImageService imageService, ProjectService projectService, ProjectUserAssignmentService projectUserAssignmentService,ClassifierCategoryService categoryService) {
         this.imageService = imageService;
         this.projectService = projectService;
         this.assignmentService = projectUserAssignmentService;
-        var projectList = assignmentService.getProjectsList(projectService.findAllProjects());
+        this.categoryService = categoryService;
+        var projectList = assignmentService.getAvailsableProjectsList();
 
         projectFilter = new ComboBox<>("Project");
         projectFilter.setItems(projectList);
@@ -86,15 +97,38 @@ public class ImageListView extends Main {
         openUploadDialogBtn = new Button("Upload Image", click -> openUploadDialogWithFile());
         openUploadDialogBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
 
+
+        parentImageFilter = new ComboBox<>("parentImage");
+        parentImageFilter.setItems(imageService.getParentImages(projectList));
+        parentImageFilter.setItemLabelGenerator(Image::getFilename);
+        parentImageFilter.addValueChangeListener(e -> imageGrid.getDataProvider().refreshAll());
+
+
+        classifierCategoryFilter = new ComboBox<>("Category");
+        classifierCategoryFilter.setItems(categoryService.getAllClassifierCategoryByProjectIn(projectList));
+        classifierCategoryFilter.setItemLabelGenerator(ClassifierCategory::getName);
+        classifierCategoryFilter.addValueChangeListener(e -> imageGrid.getDataProvider().refreshAll());
+
+
         configureGrid();
         setupDataProvider();
 
         setSizeFull();
 
-        add(new kz.moon.app.base.ui.component.ViewToolbar("Image List",
+        add(new kz.moon.app.base.ui.component.ViewToolbar("Image",
                 kz.moon.app.base.ui.component.ViewToolbar.group(
-                        projectFilter, statusFilter, authorFilter, uploadDateFilter, openUploadDialogBtn
+                        openUploadDialogBtn
                 )));
+        add(new kz.moon.app.base.ui.component.ViewToolbar("filtr",
+                kz.moon.app.base.ui.component.ViewToolbar.group(
+                        projectFilter, statusFilter, authorFilter, uploadDateFilter
+                )));
+
+        add(new kz.moon.app.base.ui.component.ViewToolbar("filtr",
+                kz.moon.app.base.ui.component.ViewToolbar.group(
+                        parentImageFilter, classifierCategoryFilter
+                )));
+
         add(imageGrid);
     }
 
@@ -112,14 +146,32 @@ public class ImageListView extends Main {
                         .map(User::getUsername).orElse(""))
                 .setHeader("Uploaded By")
                 .setAutoWidth(true);
-        imageGrid.addColumn(image -> image.getUploadDate().toString())
+
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm")
+                .withZone(ZoneId.of("Asia/Almaty")); // Казахстанское время
+        imageGrid.addColumn(image ->
+                        image.getUploadDate() != null
+                                ? formatter.format(image.getUploadDate())
+                                : "")
                 .setHeader("Upload Date")
                 .setAutoWidth(true)
                 .setSortable(true);
+
         imageGrid.addColumn(image -> image.getStatus().name())
                 .setHeader("Status")
                 .setAutoWidth(true)
                 .setSortable(true);
+
+        imageGrid.addColumn(image -> Optional.ofNullable(image.getParentImage())
+                        .map(Image::getFilename).orElse(""))
+                .setHeader("ParentImage")
+                .setAutoWidth(true);
+
+        imageGrid.addColumn(image -> Optional.ofNullable(image.getClassifierCategory())
+                        .map(ClassifierCategory::getlevelName).orElse(""))
+                .setHeader("Category")
+                .setAutoWidth(true);
+
 
         imageGrid.addComponentColumn(image -> {
             Button editButton = new Button("Edit", click -> editImage(image));
@@ -146,6 +198,8 @@ public class ImageListView extends Main {
                             projectFilter.getValue(),
                             statusFilter.getValue(),
                             authorFilter.getValue(),
+                            parentImageFilter.getValue(),
+                            classifierCategoryFilter.getValue(),
                             uploadDateFilter.getValue(),
                             offset, limit, sortBy, asc
                     ).stream();
@@ -154,28 +208,46 @@ public class ImageListView extends Main {
                         projectFilter.getValue(),
                         statusFilter.getValue(),
                         authorFilter.getValue(),
+                        parentImageFilter.getValue(),
+                        classifierCategoryFilter.getValue(),
                         uploadDateFilter.getValue()
                 )
         );
         imageGrid.setDataProvider(dataProvider);
     }
     private void editImage(Image image) {
+        var projectList = assignmentService.getAvailsableProjectsList();
         Dialog dialog = new Dialog();
         dialog.setHeaderTitle("Edit Image");
         dialog.setCloseOnEsc(true);
         dialog.setCloseOnOutsideClick(true);
 
         TextField filenameField = new TextField("Filename", image.getFilename(), "");
-        ComboBox<Project> projectField = new ComboBox<>("Project", projectService.findAllProjects());
+        ComboBox<Project> projectField = new ComboBox<>("Project", projectList);
         projectField.setItemLabelGenerator(Project::getName);
         projectField.setValue(image.getProject());
         ComboBox<ImageStatus> statusField = new ComboBox<>("Status", imageStatusList);
         statusField.setValue(image.getStatus());
 
+
+        ComboBox<Image> parentImageField = new ComboBox<>("Parent Image", imageService.findAllImages());
+        parentImageField.setItemLabelGenerator(Image::getFilename);
+        parentImageField.setValue(image.getParentImage());
+
+        ComboBox<ClassifierCategory> classifierCategoryField
+                = new ComboBox<>("Classifier Category", categoryService.getAllClassifierCategoryByProjectIn(projectList));
+        classifierCategoryField.setItemLabelGenerator(ClassifierCategory::getName);
+        classifierCategoryField.setValue(image.getClassifierCategory());
+
+
+
         Button saveButton = new Button("Save", event -> {
             image.setFilename(filenameField.getValue());
             image.setProject(projectField.getValue());
             image.setStatus(statusField.getValue());
+            image.setParentImage(parentImageField.getValue());
+            image.setParentFilename(image.getFilename());
+            image.setClassifierCategory(classifierCategoryField.getValue());
             imageService.updateImage(image);
             imageGrid.getDataProvider().refreshAll();
             dialog.close();
@@ -186,7 +258,7 @@ public class ImageListView extends Main {
         Button cancelButton = new Button("Cancel", event -> dialog.close());
         HorizontalLayout buttons = new HorizontalLayout(saveButton, cancelButton);
 
-        dialog.add(new VerticalLayout(filenameField, projectField, statusField, buttons));
+        dialog.add(new VerticalLayout(filenameField, projectField, statusField,parentImageField,classifierCategoryField, buttons));
         dialog.open();
     }
 

@@ -24,4 +24,12 @@ public class ClassifierCategory {
     private Classifier classifier;
 
     private String instructions; // описание для пользователей (например, как размечать)
+
+    public String getClassifierName() {
+        return classifier.getName();
+    }
+
+    public String getlevelName() {
+        return getClassifierName().concat(":".concat(name));
+    }
 }

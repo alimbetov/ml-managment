@@ -39,4 +39,11 @@ public class MyUserDetailsService implements UserDetailsService {
         }
         return null; // или можно выбросить исключение
     }
+
+    public Optional<User> getUserById(Long id){
+       return userRepository.findById(id);
+    }
+
+
+
 }
