@@ -1,6 +1,8 @@
 package kz.moon.app.seclevel.ui.view;
 
 import com.vaadin.flow.component.datepicker.DatePicker;
+import com.vaadin.flow.component.icon.Icon;
+import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.upload.Upload;
 import com.vaadin.flow.component.upload.receivers.MemoryBuffer;
 import kz.moon.app.seclevel.domain.User;
@@ -134,18 +136,34 @@ public class ImageListView extends Main {
 
 
     private void configureGrid() {
+
+        imageGrid.addComponentColumn(image -> {
+            Icon statusIcon;
+            switch (image.getStatus()) {
+                case UPLOADED -> statusIcon = VaadinIcon.CLOUD_UPLOAD_O.create();
+                case IN_PROGRESS -> statusIcon = VaadinIcon.TIME_FORWARD.create();
+                case MARKED -> statusIcon = VaadinIcon.FLAG.create();
+                case REVIEWED -> statusIcon = VaadinIcon.SEARCH.create();
+                case APPROVED -> statusIcon = VaadinIcon.CHECK.create();
+                case REJECTED -> statusIcon = VaadinIcon.CLOSE_SMALL.create();
+                default -> statusIcon = VaadinIcon.QUESTION.create();
+            }
+            statusIcon.getElement().setAttribute("title", image.getStatus().name());
+            return statusIcon;
+        }).setHeader("Status").setAutoWidth(true);
+
         imageGrid.addColumn(Image::getFilename)
                 .setHeader("Filename")
                 .setAutoWidth(true)
-                .setSortable(true);
+                .setSortable(false);
         imageGrid.addColumn(image -> Optional.ofNullable(image.getProject())
                         .map(Project::getName).orElse(""))
                 .setHeader("Project")
-                .setAutoWidth(true);
+                .setAutoWidth(false);
         imageGrid.addColumn(image -> Optional.ofNullable(image.getUploadedBy())
                         .map(User::getUsername).orElse(""))
                 .setHeader("Uploaded By")
-                .setAutoWidth(true);
+                .setAutoWidth(false);
 
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm")
                 .withZone(ZoneId.of("Asia/Almaty")); // Казахстанское время
@@ -155,12 +173,9 @@ public class ImageListView extends Main {
                                 : "")
                 .setHeader("Upload Date")
                 .setAutoWidth(true)
-                .setSortable(true);
+                .setSortable(false);
 
-        imageGrid.addColumn(image -> image.getStatus().name())
-                .setHeader("Status")
-                .setAutoWidth(true)
-                .setSortable(true);
+
 
         imageGrid.addColumn(image -> Optional.ofNullable(image.getParentImage())
                         .map(Image::getFilename).orElse(""))
@@ -170,15 +185,25 @@ public class ImageListView extends Main {
         imageGrid.addColumn(image -> Optional.ofNullable(image.getClassifierCategory())
                         .map(ClassifierCategory::getlevelName).orElse(""))
                 .setHeader("Category")
-                .setAutoWidth(true);
-
+                .setAutoWidth(false);
 
         imageGrid.addComponentColumn(image -> {
-            Button editButton = new Button("Edit", click -> editImage(image));
-            Button deleteButton = new Button("Delete", click -> deleteImage(image));
-            deleteButton.addThemeVariants(ButtonVariant.LUMO_ERROR);
-            return new HorizontalLayout(editButton, deleteButton);
-        }).setHeader("Actions");
+            Button editButton = new Button(new Icon(VaadinIcon.EDIT));
+            editButton.addThemeVariants(ButtonVariant.LUMO_ICON, ButtonVariant.LUMO_TERTIARY);
+            editButton.getElement().setAttribute("title", "Edit");
+            editButton.addClickListener(click -> editImage(image));
+
+            Button deleteButton = new Button(new Icon(VaadinIcon.TRASH));
+            deleteButton.addThemeVariants(ButtonVariant.LUMO_ICON, ButtonVariant.LUMO_ERROR);
+            deleteButton.getElement().setAttribute("title", "Delete");
+            deleteButton.addClickListener(click -> deleteImage(image));
+
+            HorizontalLayout actionsLayout = new HorizontalLayout(editButton, deleteButton);
+            actionsLayout.setSpacing(false); // убираем лишние отступы
+            actionsLayout.setPadding(false); // убираем паддинги
+            return actionsLayout;
+        }).setHeader("Actions").setAutoWidth(true);
+
 
         imageGrid.setPageSize(25);
         imageGrid.setSizeFull();
