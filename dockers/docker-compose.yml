@@ -1,0 +1,77 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: my_postgres_4ml
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ml_mng_db
+      POSTGRES_USER: cobra
+      POSTGRES_PASSWORD: cobra
+    ports:
+      - "5454:5432"  # Внешний порт → внутренний порт
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      app_net:
+        aliases:
+          - db.local
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: my_pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5555:80"  # pgAdmin будет доступен на http://localhost:5555
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      - postgres
+    networks:
+      - app_net
+
+  minio:
+    image: minio/minio
+    container_name: my_minio
+    command: server /data --console-address ":9001"
+    restart: unless-stopped
+    ports:
+      - "9100:9000"  # MinIO API будет доступен на http://localhost:9100
+      - "9101:9001"  # MinIO Web UI будет доступен на http://localhost:9101
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - minio_data:/data
+    networks:
+      app_net:
+        aliases:
+          - minio.local
+
+  mc:
+    image: minio/mc
+    container_name: my_mc
+    depends_on:
+      - minio
+    entrypoint: >
+      sh -c "
+        sleep 10 && 
+        mc alias set local http://my_minio:9000 minioadmin minioadmin && 
+        mc mb -p local/mybucket || true && 
+        tail -f /dev/null
+      "
+    networks:
+      - app_net
+
+volumes:
+  postgres_data:
+  pgadmin_data:
+  minio_data:
+
+networks:
+  app_net:
+    driver: bridge

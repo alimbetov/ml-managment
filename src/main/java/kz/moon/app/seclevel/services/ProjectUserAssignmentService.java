@@ -15,6 +15,7 @@ import org.springframework.data.domain.Sort;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class ProjectUserAssignmentService {
@@ -73,15 +74,12 @@ public class ProjectUserAssignmentService {
     public  List<Project> getProjectsList( List<Project> projects) {
         return assignmentRepository.findDistinctProjectsIn(projects);
     }
-    public  List<Project> getAvailsableProjectsList( ) {
-        var currentUser = myUserDetailsService.getCurrentUser()
-                .orElseThrow(() -> new IllegalArgumentException("user not found"));
-        List<User> userList = new ArrayList<>();
-         if(currentUser!=null) {
-             userList.add(currentUser);
-         }
-        return assignmentRepository.findDistinctUserIn(userList);
+    public List<Project> getAvailsableProjectsList() {
+        return myUserDetailsService.getCurrentUser()
+                .map(user -> assignmentRepository.findDistinctUserIn(List.of(user)))
+                .orElse(List.of());
     }
+
 
 
 

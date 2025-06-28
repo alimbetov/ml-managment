@@ -8,7 +8,7 @@ import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.data.provider.DataProvider;
 import com.vaadin.flow.router.Route;
 import kz.moon.app.seclevel.model.ImageAnnotation;
-import kz.moon.app.seclevel.model.Image;
+import kz.moon.app.seclevel.model.ImageData;
 import kz.moon.app.seclevel.model.ClassifierCategory;
 import kz.moon.app.seclevel.services.ImageAnnotationService;
 import kz.moon.app.seclevel.services.ImageService;
@@ -49,7 +49,7 @@ public class ImageAnnotationListView extends Main {
     private final ImageService imageService;
     private final ClassifierCategoryService categoryService;
 
-    private final ComboBox<Image> imageCombo;
+    private final ComboBox<ImageData> imageCombo;
     private final ComboBox<ClassifierCategory> categoryCombo;
     private final TextArea annotationField;
     private final Checkbox validatedCheckbox;
@@ -65,7 +65,7 @@ public class ImageAnnotationListView extends Main {
         this.categoryService = categoryService;
 
         imageCombo = new ComboBox<>("Image");
-        List<Image> images = imageService.findAllImages();
+        List<ImageData> images = imageService.findAllImages();
         imageCombo.setItems(images);
         imageCombo.setItemLabelGenerator(img -> img.getFilename());
         imageCombo.setPlaceholder("Select image");
@@ -184,7 +184,7 @@ public class ImageAnnotationListView extends Main {
         dialog.setCloseOnEsc(true);
         dialog.setCloseOnOutsideClick(true);
 
-        ComboBox<Image> imageField = new ComboBox<>("Image", imageService.findAllImages());
+        ComboBox<ImageData> imageField = new ComboBox<>("Image", imageService.findAllImages());
         imageField.setItemLabelGenerator(img -> img.getFilename());
         imageField.setValue(annotation.getImage());
         ComboBox<ClassifierCategory> categoryField = new ComboBox<>("Category", categoryService.findAllCategories());

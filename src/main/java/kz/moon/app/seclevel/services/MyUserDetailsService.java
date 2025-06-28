@@ -37,8 +37,9 @@ public class MyUserDetailsService implements UserDetailsService {
         if (auth != null && auth.isAuthenticated() && auth.getPrincipal() instanceof UserPrincipal userPrincipal) {
           return userRepository.findByUsername(auth.getName());
         }
-        return null; // или можно выбросить исключение
+        return Optional.empty(); // или можно выбросить исключение
     }
+
 
     public Optional<User> getUserById(Long id){
        return userRepository.findById(id);

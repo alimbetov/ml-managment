@@ -82,6 +82,8 @@ public final class MainLayout extends AppLayout {
         nav.addItem(new SideNavItem("Images", "image-list", VaadinIcon.PICTURE.create()));
         nav.addItem(new SideNavItem("Annotations", "annotation-list", VaadinIcon.FILE_TEXT.create()));
         nav.addItem(new SideNavItem("Assignments", "assignment-list", VaadinIcon.USERS.create()));
+        // 💥 Статистика
+        nav.addItem(new SideNavItem("Statistics", "project-statistics", VaadinIcon.CHART.create()));
     }
 
     private void addAdminPages(SideNav nav) {

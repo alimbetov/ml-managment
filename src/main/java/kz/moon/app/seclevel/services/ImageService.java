@@ -4,13 +4,12 @@ import jakarta.annotation.Nullable;
 import jakarta.validation.constraints.NotNull;
 import kz.moon.app.seclevel.domain.User;
 import kz.moon.app.seclevel.model.ClassifierCategory;
-import kz.moon.app.seclevel.model.Image;
+import kz.moon.app.seclevel.model.ImageData;
 import kz.moon.app.seclevel.repository.ClassifierCategoryRepository;
 import kz.moon.app.seclevel.repository.ImageStatus;
 import kz.moon.app.seclevel.model.Project;
 import kz.moon.app.seclevel.repository.ImageRepository;
 import kz.moon.app.seclevel.repository.ProjectRepository;
-import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Service;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.PageRequest;
@@ -40,7 +39,7 @@ public class ImageService {
         this.userDetailsService = userDetailsService;
     }
 
-    public List<Image> find(int offset, int limit, String sortBy, boolean asc) {
+    public List<ImageData> find(int offset, int limit, String sortBy, boolean asc) {
         Pageable pageable = PageRequest.of(offset / limit, limit,
                 asc ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending());
         return imageRepository.findAllBy(pageable).getContent();
@@ -50,13 +49,13 @@ public class ImageService {
         return imageRepository.count();
     }
 
-    public List<Image> find(Project projectFilter,
-                            ImageStatus statusFilter,
-                            User authorFilter,
-                            Image parentImageFilter,
-                            ClassifierCategory classifierCategoryFilter,
-                            LocalDate uploadDateFilter,
-                            int offset, int limit, String sortBy, boolean asc) {
+    public List<ImageData> find(Project projectFilter,
+                                ImageStatus statusFilter,
+                                User authorFilter,
+                                ImageData parentImageFilter,
+                                ClassifierCategory classifierCategoryFilter,
+                                LocalDate uploadDateFilter,
+                                int offset, int limit, String sortBy, boolean asc) {
 
         Pageable pageable = PageRequest.of(offset / limit, limit,
                 asc ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending());
@@ -88,7 +87,7 @@ public class ImageService {
     public long count(Project projectFilter,
                       ImageStatus statusFilter,
                       User authorFilter,
-                      Image parentImageFilter,
+                      ImageData parentImageFilter,
                       ClassifierCategory classifierCategoryFilter,
                       LocalDate uploadDateFilter) {
 
@@ -116,7 +115,7 @@ public class ImageService {
         );
     }
 
-    public Image updateImage(Image image) {
+    public ImageData updateImage(ImageData image) {
         return imageRepository.save(image);
     }
 
@@ -124,7 +123,7 @@ public class ImageService {
         imageRepository.deleteById(imageId);
     }
 
-    public List<Image> findAllImages() {
+    public List<ImageData> findAllImages() {
         return imageRepository.findAll();
     }
 
@@ -147,7 +146,7 @@ public class ImageService {
         var createdBy = userDetailsService.getCurrentUser()
                 .orElseThrow(() -> new IllegalArgumentException("user not found"));
 
-        Image.ImageBuilder builder = Image.builder()
+        ImageData.ImageDataBuilder builder = ImageData.builder()
                 .filename(filename)
                 .fileHash(Integer.toHexString(filename.hashCode()))
                 .project(project)
@@ -169,11 +168,11 @@ public class ImageService {
             );
         }
 
-        Image image = builder.build();
-        updateImage(image);
+        ImageData imageData = builder.build();
+        updateImage(imageData);
     }
 
-    public List<Image> getParentImages(List<Project> projects){
+    public List<ImageData> getParentImages(List<Project> projects){
        return imageRepository.findImagesWithoutParentByProjects(projects);
     }
 

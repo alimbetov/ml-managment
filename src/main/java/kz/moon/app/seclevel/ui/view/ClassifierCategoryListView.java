@@ -1,5 +1,6 @@
 package kz.moon.app.seclevel.ui.view;
 
+import com.vaadin.flow.component.textfield.TextArea;
 import kz.moon.app.seclevel.model.ClassifierCategory;
 import kz.moon.app.seclevel.model.Classifier;
 import kz.moon.app.seclevel.model.Project;
@@ -37,7 +38,9 @@ public class ClassifierCategoryListView extends Main {
     private final ClassifierService classifierService;
 
     private final TextField nameField;
-    private final TextField instructionsField;
+
+    private final TextArea instructionsField;
+
     private final ComboBox<Classifier> classifierCombo;
     private final Button createBtn;
     private final TextField filterField;
@@ -50,8 +53,13 @@ public class ClassifierCategoryListView extends Main {
         nameField = new TextField();
         nameField.setPlaceholder("Category name");
         nameField.setMaxLength(255);
-        instructionsField = new TextField();
-        instructionsField.setPlaceholder("Instructions");
+
+
+        instructionsField = new TextArea("Instructions");
+        instructionsField.setWidthFull();
+        instructionsField.setHeight("150px");
+        instructionsField.setPlaceholder("Enter instructions here...");
+
         classifierCombo = new ComboBox<>("Classifier");
         List<Classifier> classifiers = classifierService.findAllClassifiers();
         classifierCombo.setItems(classifiers);
@@ -152,7 +160,12 @@ public class ClassifierCategoryListView extends Main {
         dialog.setCloseOnOutsideClick(true);
 
         TextField nameField = new TextField("Name", category.getName(), "");
-        TextField instructionsField = new TextField("Instructions", category.getInstructions(), "");
+
+        TextArea instructionsField = new TextArea("Instructions");
+        instructionsField.setWidthFull();
+        instructionsField.setHeight("150px");
+        instructionsField.setValue(Optional.ofNullable(category.getInstructions()).orElse(""));
+
         ComboBox<Classifier> classifierField = new ComboBox<>("Classifier", classifierService.findAllClassifiers());
         classifierField.setItemLabelGenerator(Classifier::getName);
         classifierField.setValue(category.getClassifier());
@@ -168,6 +181,7 @@ public class ClassifierCategoryListView extends Main {
                     .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
         });
         saveButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+
         Button cancelButton = new Button("Cancel", event -> dialog.close());
         HorizontalLayout buttons = new HorizontalLayout(saveButton, cancelButton);
 

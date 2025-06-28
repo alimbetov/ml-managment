@@ -127,6 +127,13 @@
             <artifactId>lombok</artifactId>
             <version>1.18.38</version>
         </dependency>
+
+        <!-- MinIO SDK -->
+        <dependency>
+            <groupId>io.minio</groupId>
+            <artifactId>minio</artifactId>
+            <version>8.5.5</version>
+        </dependency>
         <!-- Testing -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

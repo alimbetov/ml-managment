@@ -1,13 +1,11 @@
 package kz.moon.app.seclevel.services;
 
 import kz.moon.app.seclevel.model.ImageAnnotation;
-import kz.moon.app.seclevel.model.Image;
+import kz.moon.app.seclevel.model.ImageData;
 import kz.moon.app.seclevel.model.ClassifierCategory;
-import kz.moon.app.seclevel.model.Project;
 import kz.moon.app.seclevel.repository.ImageAnnotationRepository;
 import kz.moon.app.seclevel.repository.ImageRepository;
 import kz.moon.app.seclevel.repository.ClassifierCategoryRepository;
-import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Service;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.PageRequest;
@@ -51,7 +49,7 @@ public class ImageAnnotationService {
     }
 
     public ImageAnnotation createAnnotation(Long imageId, Long categoryId, String annotationJson, boolean validated) {
-        Image image = imageRepository.findById(imageId)
+        ImageData image = imageRepository.findById(imageId)
                 .orElseThrow(() -> new IllegalArgumentException("Image not found"));
         ClassifierCategory category = categoryRepository.findById(categoryId)
                 .orElseThrow(() -> new IllegalArgumentException("Category not found"));

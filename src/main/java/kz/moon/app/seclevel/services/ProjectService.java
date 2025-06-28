@@ -11,6 +11,7 @@ import org.springframework.data.domain.Sort;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class ProjectService {
@@ -77,6 +78,11 @@ public class ProjectService {
     public List<Project> findAllProjects() {
         return projectRepository.findAll();
     }
+
+    public Optional<Project> getProject(Long projectId) {
+        return projectRepository.findById(projectId);
+    }
+
 
 
 }

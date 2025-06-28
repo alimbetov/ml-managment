@@ -1,5 +1,5 @@
 package kz.moon.app.seclevel.ui.view;
-
+import com.vaadin.flow.component.html.Image;
 import com.vaadin.flow.component.datepicker.DatePicker;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.VaadinIcon;
@@ -7,7 +7,7 @@ import com.vaadin.flow.component.upload.Upload;
 import com.vaadin.flow.component.upload.receivers.MemoryBuffer;
 import kz.moon.app.seclevel.domain.User;
 import kz.moon.app.seclevel.model.ClassifierCategory;
-import kz.moon.app.seclevel.model.Image;
+import kz.moon.app.seclevel.model.ImageData;
 import kz.moon.app.seclevel.model.Project;
 import kz.moon.app.seclevel.repository.ImageStatus;
 import kz.moon.app.seclevel.services.ClassifierCategoryService;
@@ -33,7 +33,7 @@ import com.vaadin.flow.router.PageTitle;
 import jakarta.annotation.security.PermitAll;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.annotation.Secured;
-
+import com.vaadin.flow.dom.Element;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -55,14 +55,14 @@ public class ImageListView extends Main {
     private final ComboBox<Project> projectFilter;
     private final ComboBox<ImageStatus> statusFilter;
     private final ComboBox<User> authorFilter;
-    private final ComboBox<Image> parentImageFilter;
+    private final ComboBox<ImageData> parentImageFilter;
     private final ComboBox<ClassifierCategory> classifierCategoryFilter;
 
     private final DatePicker uploadDateFilter;
 
     private final Button openUploadDialogBtn;
 
-    private final Grid<Image> imageGrid = new Grid<>(Image.class, false);
+    private final Grid<ImageData> imageGrid = new Grid<>(ImageData.class, false);
 
     private final List<ImageStatus> imageStatusList = List.of(
             ImageStatus.UPLOADED,
@@ -79,7 +79,6 @@ public class ImageListView extends Main {
         this.assignmentService = projectUserAssignmentService;
         this.categoryService = categoryService;
         var projectList = assignmentService.getAvailsableProjectsList();
-
         projectFilter = new ComboBox<>("Project");
         projectFilter.setItems(projectList);
         projectFilter.setItemLabelGenerator(Project::getName);
@@ -102,7 +101,7 @@ public class ImageListView extends Main {
 
         parentImageFilter = new ComboBox<>("parentImage");
         parentImageFilter.setItems(imageService.getParentImages(projectList));
-        parentImageFilter.setItemLabelGenerator(Image::getFilename);
+        parentImageFilter.setItemLabelGenerator(ImageData::getFilename);
         parentImageFilter.addValueChangeListener(e -> imageGrid.getDataProvider().refreshAll());
 
 
@@ -152,7 +151,7 @@ public class ImageListView extends Main {
             return statusIcon;
         }).setHeader("Status").setAutoWidth(true);
 
-        imageGrid.addColumn(Image::getFilename)
+        imageGrid.addColumn(ImageData::getFilename)
                 .setHeader("Filename")
                 .setAutoWidth(true)
                 .setSortable(false);
@@ -178,7 +177,7 @@ public class ImageListView extends Main {
 
 
         imageGrid.addColumn(image -> Optional.ofNullable(image.getParentImage())
-                        .map(Image::getFilename).orElse(""))
+                        .map(ImageData::getFilename).orElse(""))
                 .setHeader("ParentImage")
                 .setAutoWidth(true);
 
@@ -209,7 +208,7 @@ public class ImageListView extends Main {
         imageGrid.setSizeFull();
     }
     private void setupDataProvider() {
-        CallbackDataProvider<Image, Void> dataProvider = DataProvider.fromCallbacks(
+        CallbackDataProvider<ImageData, Void> dataProvider = DataProvider.fromCallbacks(
                 query -> {
                     int offset = query.getOffset();
                     int limit = query.getLimit();
@@ -240,14 +239,85 @@ public class ImageListView extends Main {
         );
         imageGrid.setDataProvider(dataProvider);
     }
-    private void editImage(Image image) {
+    private void editImage(ImageData image) {
+        // Заглушка — пока тестовый URL, можно будет потом сделать реальный URL из image.getFilename() или image.getId()
+        String imageUrl = "https://bfoto.ru/foto/zakat/bfoto_ru_5029.jpg";
+
+
+
+// Test polygon (можно будет потом получать из image.getAnnotations() или image.getJson())
+        String polygonJson = "[{\"x\":100,\"y\":100},{\"x\":200,\"y\":120},{\"x\":180,\"y\":250},{\"x\":90,\"y\":230}]";
+
+        Image previewImage = new Image(imageUrl, "Preview of " + image.getFilename());
+        previewImage.setId("preview-image");
+        previewImage.getStyle()
+                .set("max-width", "100%")
+                .set("max-height", "400px")
+                .set("border", "1px solid #ccc")
+                .set("padding", "4px")
+                .set("position", "relative");
+
+        Span sizeLabel = new Span("Loading image size...");
+
+        previewImage.getElement().executeJs(
+                "var img = this;" +
+                        "img.addEventListener('load', function() {" +
+                        "   const w = img.naturalWidth;" +
+                        "   const h = img.naturalHeight;" +
+                        "   $0.textContent = 'Size: ' + w + ' x ' + h + ' px';" +
+                        "});",
+                sizeLabel.getElement()
+        );
+
+        Element canvasElement = new Element("canvas");
+        canvasElement.setAttribute("id", "polygon-canvas");
+        canvasElement.getStyle()
+                .set("position", "absolute")
+                .set("top", "0px")
+                .set("left", "0px")
+                .set("pointer-events", "none");
+
+// JS — рисуем полигон после загрузки картинки
+        previewImage.getElement().executeJs(
+                """
+                const img = this;
+                img.addEventListener('load', function() {
+                    const canvas = document.getElementById('polygon-canvas');
+                    canvas.width = img.clientWidth;
+                    canvas.height = img.clientHeight;
+                    const ctx = canvas.getContext('2d');
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    ctx.strokeStyle = 'red';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    const points = JSON.parse($0);
+                    if (points.length > 0) {
+                        ctx.moveTo(points[0].x * canvas.width / img.naturalWidth, points[0].y * canvas.height / img.naturalHeight);
+                        for (let i = 1; i < points.length; i++) {
+                            ctx.lineTo(points[i].x * canvas.width / img.naturalWidth, points[i].y * canvas.height / img.naturalHeight);
+                        }
+                        ctx.closePath();
+                        ctx.stroke();
+                    }
+                });
+                """,
+                polygonJson
+        );
+        com.vaadin.flow.component.html.Div imageContainer = new com.vaadin.flow.component.html.Div();
+        imageContainer.getStyle()
+                .set("position", "relative")
+                .set("display", "inline-block");
+
+        imageContainer.getElement().appendChild(previewImage.getElement());
+        imageContainer.getElement().appendChild(canvasElement);
+
         var projectList = assignmentService.getAvailsableProjectsList();
         Dialog dialog = new Dialog();
-        dialog.setHeaderTitle("Edit Image");
+        dialog.setHeaderTitle("Image meta data edition");
         dialog.setCloseOnEsc(true);
         dialog.setCloseOnOutsideClick(true);
 
-        TextField filenameField = new TextField("Filename", image.getFilename(), "");
+        TextField filenameField = new TextField( image.getFilename(), "");
         ComboBox<Project> projectField = new ComboBox<>("Project", projectList);
         projectField.setItemLabelGenerator(Project::getName);
         projectField.setValue(image.getProject());
@@ -255,8 +325,8 @@ public class ImageListView extends Main {
         statusField.setValue(image.getStatus());
 
 
-        ComboBox<Image> parentImageField = new ComboBox<>("Parent Image", imageService.findAllImages());
-        parentImageField.setItemLabelGenerator(Image::getFilename);
+        ComboBox<ImageData> parentImageField = new ComboBox<>("Parent Image", imageService.findAllImages());
+        parentImageField.setItemLabelGenerator(ImageData::getFilename);
         parentImageField.setValue(image.getParentImage());
 
         ComboBox<ClassifierCategory> classifierCategoryField
@@ -283,11 +353,17 @@ public class ImageListView extends Main {
         Button cancelButton = new Button("Cancel", event -> dialog.close());
         HorizontalLayout buttons = new HorizontalLayout(saveButton, cancelButton);
 
-        dialog.add(new VerticalLayout(filenameField, projectField, statusField,parentImageField,classifierCategoryField, buttons));
+
+        dialog.add( new VerticalLayout(
+                new HorizontalLayout(projectField, parentImageField),
+                new HorizontalLayout(classifierCategoryField,statusField),
+                        new HorizontalLayout(sizeLabel,filenameField, buttons),
+                        imageContainer
+                ));
         dialog.open();
     }
 
-    private void deleteImage(Image image) {
+    private void deleteImage(ImageData image) {
         Dialog confirmDialog = new Dialog();
         confirmDialog.setHeaderTitle("Confirm Delete");
         confirmDialog.setCloseOnEsc(true);

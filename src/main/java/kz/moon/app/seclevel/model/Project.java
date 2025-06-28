@@ -39,5 +39,5 @@ public class Project {
     private Set<Classifier> classifiers;
 
     @OneToMany(mappedBy = "project", cascade = CascadeType.ALL)
-    private Set<Image> images;
+    private Set<ImageData> images;
 }

@@ -13,7 +13,7 @@ logging:
 
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/ml_mng_db
+    url: jdbc:postgresql://localhost:5454/ml_mng_db
     username: cobra
     password: cobra
     driver-class-name: org.postgresql.Driver
@@ -42,4 +42,9 @@ management:
       exposure:
         include: "*"
 
+minio:
+  url: http://localhost:9100
+  accessKey: minioadmin
+  secretKey: minioadmin
+  bucket: mybucket
 

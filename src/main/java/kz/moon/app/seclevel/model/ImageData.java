@@ -17,7 +17,7 @@ import java.util.Set;
 @Builder
 @Table(name = "image_data")
 @EqualsAndHashCode(onlyExplicitlyIncluded = true) // <= Важно
-public class Image {
+public class ImageData {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @EqualsAndHashCode.Include // <= включаем только id в hashCode
@@ -41,7 +41,7 @@ public class Image {
     // === Привязка к оригинальному изображению ===
     @ManyToOne
     @JoinColumn(name = "parent_image_id")
-    private Image parentImage;
+    private ImageData parentImage;
 
     private String parentFilename;
 

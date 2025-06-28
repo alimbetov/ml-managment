@@ -20,7 +20,7 @@ public class ImageAnnotation {
     private Long id;
 
     @ManyToOne
-    private Image image;
+    private ImageData image;
 
     @ManyToOne
     private ClassifierCategory category;
