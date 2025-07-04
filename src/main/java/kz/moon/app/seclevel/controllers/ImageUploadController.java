@@ -41,35 +41,29 @@ public class ImageUploadController {
                                  @RequestParam("projectId") Long projectId) throws Exception {
 
         var fileStatus = ImageStatus.fromStringSafe(status).orElse(ImageStatus.UPLOADED);
-
         // 1. Вычисляем hash
         String fileHash;
         try (InputStream stream = file.getInputStream()) {
             fileHash = FileHashUtil.calculateSHA256(stream);
         }
-
         // 2. Проверка на дубликаты
         Optional<ImageData> existingImage = imageDataRepository.findByFileHash(fileHash);
         if (existingImage.isPresent()) {
             return existingImage.get();
         }
-
         // 3. Генерация имени файла
         String originalFilename = file.getOriginalFilename();
         String extension = (originalFilename != null && originalFilename.contains("."))
                 ? originalFilename.substring(originalFilename.lastIndexOf('.'))
                 : ".jpg";
         String generatedFilename = "img_" + UUID.randomUUID() + extension;
-
         // 4. Загрузка в MinIO
         try (InputStream uploadStream = file.getInputStream()) {
             minioService.uploadFile(generatedFilename, uploadStream, file.getContentType(), file.getSize());
         }
-
         // 5. Получение проекта
         Project project = projectService.getProject(projectId)
                 .orElseThrow(() -> new IllegalArgumentException("Project with id " + projectId + " not found"));
-
         // 6. Создание ImageData
         ImageData image = ImageData.builder()
                 .filename(generatedFilename)
@@ -84,17 +78,14 @@ public class ImageUploadController {
         // 7. Обработка аннотации (если передана)
         if (annotationJson != null && !annotationJson.isEmpty()) {
             String annotationContent = new String(annotationJson.getBytes());
-
             ImageAnnotation annotation = ImageAnnotation.builder()
                     .image(image)
                     .annotationJson(annotationContent)
                     .validated(false)
                     .createdAt(Instant.now())
                     .build();
-
             imageAnnotationRepository.save(annotation); // нужно внедрить imageAnnotationRepository
         }
-
         return image;
     }
 

@@ -400,12 +400,14 @@ public class ImageListView extends Main {
 
         upload.addSucceededListener(event -> {
             String filename = event.getFileName();
+
             if (projectField.getValue() == null) {
                 Notification.show("Please select project first!", 3000, Notification.Position.MIDDLE)
                         .addThemeVariants(NotificationVariant.LUMO_ERROR);
                 return;
             }
-
+            String contentType = event.getMIMEType();
+            Long fsize = event.getContentLength();
             try (var inputStream = buffer.getInputStream()) {
                 imageService.saveUploadedFile(filename, projectField.getValue().getId(), inputStream);
                 imageGrid.getDataProvider().refreshAll();
