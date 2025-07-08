@@ -118,6 +118,7 @@ public final class MainLayout extends AppLayout {
 
         if (authentication != null && authentication.isAuthenticated()) {
             Object principal = authentication.getPrincipal();
+            System.out.println("Principal class: " + principal.getClass().getName());
             if (principal instanceof UserPrincipal userPrincipal) {
                 displayName = userPrincipal.getDisplayName();
             }

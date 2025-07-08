@@ -11,6 +11,10 @@ logging:
   launch-browser: true
   allowed-packages: com.vaadin, org.vaadin, com.flowingcode, kz.moon.app
 
+vaadin:
+  pnpm:
+    enable: false
+
 spring:
   datasource:
     url: jdbc:postgresql://localhost:5454/ml_mng_db
