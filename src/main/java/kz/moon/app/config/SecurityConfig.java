@@ -4,6 +4,7 @@ import kz.moon.app.seclevel.services.MyUserDetailsService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -21,21 +22,20 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                // CSRF для Vaadin оставляем включенным
                 .csrf().disable()
 
                 .authorizeHttpRequests(auth -> auth
-                        // Разрешаем статику и login
                         .requestMatchers(
                                 "/", "/login", "/logout", "/register",
                                 "/VAADIN/**", "/images/**", "/icons/**",
                                 "/manifest.webmanifest", "/sw.js", "/offline.html"
                         ).permitAll()
-
-                        // Остальные страницы — требуют авторизации
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )
 
+                // 👇 ВАЖНО: включаем поддержку Basic Auth (для REST клиентов)
+                .httpBasic(Customizer.withDefaults())
                 .formLogin(form -> form
                         .loginPage("/login").permitAll()
                         .defaultSuccessUrl("/", true)

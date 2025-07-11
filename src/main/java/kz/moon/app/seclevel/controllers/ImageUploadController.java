@@ -9,10 +9,13 @@ import kz.moon.app.seclevel.repository.ImageAnnotationRepository;
 import kz.moon.app.seclevel.repository.ImageRepository;
 import kz.moon.app.seclevel.repository.ImageStatus;
 
+import kz.moon.app.seclevel.services.ImageService;
 import kz.moon.app.seclevel.services.MinioService;
 import kz.moon.app.seclevel.services.ProjectService;
 import kz.moon.app.seclevel.utils.FileHashUtil;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.InputStreamResource;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -33,37 +36,54 @@ public class ImageUploadController {
 
     private final ImageAnnotationRepository imageAnnotationRepository;
 
+    private ImageService imageService;
 
+    @GetMapping("/{filename}")
+    public ResponseEntity<InputStreamResource> downloadFile(@PathVariable String filename) {
+        try {
+            InputStream inputStream = minioService.getFile(filename);
+
+            return ResponseEntity.ok()
+                    .header("Content-Disposition", "attachment; filename=" + filename)
+                    .body(new InputStreamResource(inputStream));
+
+        } catch (Exception e) {
+            return ResponseEntity
+                    .internalServerError()
+                    .body(null);
+        }
+    }
     @PostMapping("/upload")
     public ImageData uploadImage(@RequestParam("file") MultipartFile file,
-                                 @RequestParam(value = "annotation", required = false) MultipartFile annotationJson,
+                                 @RequestParam(value = "annotation", required = false) String annotationJson,
                                  @RequestParam("fileStatus") String status,
                                  @RequestParam("projectId") Long projectId) throws Exception {
 
-        var fileStatus = ImageStatus.fromStringSafe(status).orElse(ImageStatus.UPLOADED);
-        // 1. Вычисляем hash
+        // 1. Вычисляем хеш
         String fileHash;
         try (InputStream stream = file.getInputStream()) {
             fileHash = FileHashUtil.calculateSHA256(stream);
         }
-        // 2. Проверка на дубликаты
-        Optional<ImageData> existingImage = imageDataRepository.findByFileHash(fileHash);
+
+        // 2. Получение проекта
+        Project project = projectService.getProject(projectId)
+                .orElseThrow(() -> new IllegalArgumentException("Project with id " + projectId + " not found"));
+
+        // 3. Проверка на дубликаты
+        Optional<ImageData> existingImage = imageDataRepository
+                .findTop1ByProject_IdAndFileHashOrderByUploadDateDesc(projectId, fileHash);
         if (existingImage.isPresent()) {
             return existingImage.get();
         }
-        // 3. Генерация имени файла
+        // 4. Генерация имени файла
         String originalFilename = file.getOriginalFilename();
         String extension = (originalFilename != null && originalFilename.contains("."))
                 ? originalFilename.substring(originalFilename.lastIndexOf('.'))
                 : ".jpg";
         String generatedFilename = "img_" + UUID.randomUUID() + extension;
-        // 4. Загрузка в MinIO
-        try (InputStream uploadStream = file.getInputStream()) {
-            minioService.uploadFile(generatedFilename, uploadStream, file.getContentType(), file.getSize());
-        }
-        // 5. Получение проекта
-        Project project = projectService.getProject(projectId)
-                .orElseThrow(() -> new IllegalArgumentException("Project with id " + projectId + " not found"));
+        // 5. Статус
+        ImageStatus fileStatus = ImageStatus.fromStringSafe(status).orElse(ImageStatus.UPLOADED);
+
         // 6. Создание ImageData
         ImageData image = ImageData.builder()
                 .filename(generatedFilename)
@@ -75,18 +95,24 @@ public class ImageUploadController {
 
         image = imageDataRepository.save(image);
 
-        // 7. Обработка аннотации (если передана)
-        if (annotationJson != null && !annotationJson.isEmpty()) {
-            String annotationContent = new String(annotationJson.getBytes());
+        // 7. Загрузка в MinIO
+        try (InputStream uploadStream = file.getInputStream()) {
+            minioService.uploadFile(generatedFilename, uploadStream, file.getContentType(), file.getSize());
+        }
+
+        // 8. Обработка аннотации (если передана)
+        if (annotationJson != null && !annotationJson.isBlank()) {
             ImageAnnotation annotation = ImageAnnotation.builder()
                     .image(image)
-                    .annotationJson(annotationContent)
+                    .annotationJson(annotationJson)
                     .validated(false)
                     .createdAt(Instant.now())
                     .build();
-            imageAnnotationRepository.save(annotation); // нужно внедрить imageAnnotationRepository
+            imageAnnotationRepository.save(annotation);
         }
+
         return image;
     }
+
 
 }

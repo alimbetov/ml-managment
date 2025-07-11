@@ -41,4 +41,24 @@ public class MinioService {
                 .contentType(contentType)
                 .build());
     }
+
+    public InputStream getFile(String fileName) throws Exception {
+        return minioClient.getObject(
+                GetObjectArgs.builder()
+                        .bucket(bucket)
+                        .object(fileName)
+                        .build()
+        );
+    }
+
+    public void deleteFile(String fileName) {
+        try {
+            minioClient.removeObject(RemoveObjectArgs.builder()
+                    .bucket(bucket)
+                    .object(fileName)
+                    .build());
+        } catch (Exception e) {
+            throw new RuntimeException("Ошибка при удалении файла из MinIO: " + fileName, e);
+        }
+    }
 }

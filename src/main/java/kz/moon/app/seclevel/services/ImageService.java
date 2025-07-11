@@ -1,5 +1,6 @@
 package kz.moon.app.seclevel.services;
 
+import com.vaadin.flow.server.StreamResource;
 import jakarta.annotation.Nullable;
 import jakarta.validation.constraints.NotNull;
 import kz.moon.app.seclevel.domain.User;
@@ -13,8 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.multipart.MultipartFile;
+
 
 import java.io.InputStream;
 import java.time.Instant;
@@ -51,6 +51,21 @@ public class ImageService {
         this.projectService = projectService;
         this.annotationRepository = annotationRepository;
         this.minioService = minioService;
+    }
+
+
+
+    public InputStream getFile(String fileName) throws Exception {
+        return minioService.getFile(fileName);
+    }
+    public StreamResource getFileAsStreamResource(String filename) {
+        return new StreamResource(filename, () -> {
+            try {
+                return minioService.getFile(filename); // возвращает InputStream
+            } catch (Exception e) {
+                throw new RuntimeException("Could not load image: " + filename, e);
+            }
+        });
     }
 
     public List<ImageData> find(int offset, int limit, String sortBy, boolean asc) {
@@ -133,8 +148,20 @@ public class ImageService {
         return imageRepository.save(image);
     }
 
+
+
+
     public void deleteImage(Long imageId) {
-        imageRepository.deleteById(imageId);
+        imageRepository.findById(imageId).ifPresent(image -> {
+            // Удаляем из MinIO
+            minioService.deleteFile(image.getFilename());
+
+            // Удаляем аннотации (если есть)
+            annotationRepository.deleteByImage(image);
+
+            // Удаляем ImageData
+            imageRepository.delete(image);
+        });
     }
 
     public List<ImageData> findAllImages() {
@@ -143,37 +170,37 @@ public class ImageService {
 
     public void saveUploadedFile(@NotNull String filename,
                                  @NotNull Long projectId,
-                                 @NotNull InputStream inputStream) {
-        saveUploadedFile(filename, projectId, inputStream, null, null, null);
+                                 @NotNull InputStream inputStream,
+                                 @NotNull  String contentType,@NotNull  long size) {
+        saveUploadedFile(filename, projectId, inputStream,contentType, size, null, null, null);
     }
 
-    public void saveUploadedFile(@NotNull String filename,
+    public void saveUploadedFile(@NotNull String originalFilename,
                                  @NotNull Long projectId,
                                  @NotNull InputStream inputStream,
+                                 @NotNull  String contentType,
+                                 @NotNull  long size,
                                  @Nullable Long parentImageId,
                                  @Nullable String parentFilename,
-                                 @Nullable Long classifierCategoryId) {
+                                 @Nullable Long classifierCategoryId
+                                ) {
 
         var project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new IllegalArgumentException("Project not found"));
 
         var createdBy = userDetailsService.getCurrentUser()
                 .orElseThrow(() -> new IllegalArgumentException("user not found"));
-
+        String extension = (originalFilename != null && originalFilename.contains("."))
+                ? originalFilename.substring(originalFilename.lastIndexOf('.'))
+                : ".jpg";
+        String generatedFilename = "img_" + UUID.randomUUID() + extension;
         ImageData.ImageDataBuilder builder = ImageData.builder()
-                .filename(filename)
-                .fileHash(Integer.toHexString(filename.hashCode()))
+                .filename(generatedFilename)
+                .fileHash(Integer.toHexString(generatedFilename.hashCode()))
                 .project(project)
                 .uploadDate(Instant.now())
                 .status(ImageStatus.UPLOADED)
                 .uploadedBy(createdBy);
-
-        if (parentImageId != null) {
-            imageRepository.findById(parentImageId).ifPresent(builder::parentImage);
-        }
-        if (parentFilename != null && !parentFilename.isBlank()) {
-            builder.parentFilename(parentFilename);
-        }
 
         if (classifierCategoryId != null) {
             builder.classifierCategory(
@@ -182,14 +209,25 @@ public class ImageService {
             );
         }
 
+        if (parentImageId != null) {
+            imageRepository.findById(parentImageId).ifPresent(builder::parentImage);
+        }
+        if (parentFilename != null && !parentFilename.isBlank()) {
+            builder.parentFilename(parentFilename);
+        }
         ImageData imageData = builder.build();
-        updateImage(imageData);
+        imageData = updateImage(imageData);
+        try {
+            minioService.uploadFile(imageData.getFilename(),inputStream,contentType, size);
+        } catch (Exception e) {
+            System.out.println(e);
+        }
+
     }
 
     public List<ImageData> getParentImages(List<Project> projects){
        return imageRepository.findImagesWithoutParentByProjects(projects);
     }
-
 
 
     public ImageData saveUploadedFile(@NotNull Long projectId,
@@ -198,10 +236,7 @@ public class ImageService {
                                  String contentType,
                                  Long  fileSize,
                                  String annotationJson,
-                                 String status,
-                                      @Nullable Long parentImageId,
-                                      @Nullable String parentFilename,
-                                      @Nullable Long classifierCategoryId ) throws Exception {
+                                 String status) throws Exception {
 
         var project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new IllegalArgumentException("Project not found"));
@@ -216,7 +251,7 @@ public class ImageService {
             fileHash = FileHashUtil.calculateSHA256(stream);
         }
         // 2. Проверка на дубликаты
-        Optional<ImageData> existingImage = imageRepository.findByFileHash(fileHash);
+        Optional<ImageData> existingImage = imageRepository.findTop1ByProject_IdAndFileHashOrderByUploadDateDesc(projectId, fileHash);
         if (existingImage.isPresent()) {
             return existingImage.get();
         }
@@ -252,9 +287,12 @@ public class ImageService {
                     .validated(false)
                     .createdAt(Instant.now())
                     .build();
-            annotationRepository.save(annotation); // нужно внедрить imageAnnotationRepository
+            annotationRepository.save(annotation);
+            // нужно внедрить imageAnnotationRepository
         }
         return image;
     }
+
+
 
 }

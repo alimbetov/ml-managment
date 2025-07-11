@@ -5,6 +5,7 @@ import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.upload.Upload;
 import com.vaadin.flow.component.upload.receivers.MemoryBuffer;
+import com.vaadin.flow.server.StreamResource;
 import kz.moon.app.seclevel.domain.User;
 import kz.moon.app.seclevel.model.ClassifierCategory;
 import kz.moon.app.seclevel.model.ImageData;
@@ -240,15 +241,17 @@ public class ImageListView extends Main {
         imageGrid.setDataProvider(dataProvider);
     }
     private void editImage(ImageData image) {
-        // Заглушка — пока тестовый URL, можно будет потом сделать реальный URL из image.getFilename() или image.getId()
-        String imageUrl = "https://bfoto.ru/foto/zakat/bfoto_ru_5029.jpg";
-
 
 
 // Test polygon (можно будет потом получать из image.getAnnotations() или image.getJson())
         String polygonJson = "[{\"x\":100,\"y\":100},{\"x\":200,\"y\":120},{\"x\":180,\"y\":250},{\"x\":90,\"y\":230}]";
 
-        Image previewImage = new Image(imageUrl, "Preview of " + image.getFilename());
+        //Image previewImage = new Image(imageUrl, "Preview of " + image.getFilename());
+
+        StreamResource imageResource = imageService.getFileAsStreamResource(image.getFilename());
+        Image previewImage = new Image(imageResource, "Preview of " + image.getFilename());
+
+
         previewImage.setId("preview-image");
         previewImage.getStyle()
                 .set("max-width", "100%")
@@ -337,7 +340,7 @@ public class ImageListView extends Main {
 
 
         Button saveButton = new Button("Save", event -> {
-            image.setFilename(filenameField.getValue());
+            image.setFilename(image.getFilename());
             image.setProject(projectField.getValue());
             image.setStatus(statusField.getValue());
             image.setParentImage(parentImageField.getValue());
@@ -396,20 +399,20 @@ public class ImageListView extends Main {
 
         MemoryBuffer buffer = new MemoryBuffer();
         Upload upload = new Upload(buffer);
-        upload.setAcceptedFileTypes("image/jpeg", "image/png");
+        upload.setAcceptedFileTypes("application/dicom", ".dcm", "image/jpeg", "image/png");
 
         upload.addSucceededListener(event -> {
             String filename = event.getFileName();
-
             if (projectField.getValue() == null) {
                 Notification.show("Please select project first!", 3000, Notification.Position.MIDDLE)
                         .addThemeVariants(NotificationVariant.LUMO_ERROR);
                 return;
             }
-            String contentType = event.getMIMEType();
-            Long fsize = event.getContentLength();
+            var contentType = event.getMIMEType();
+            var contentLength = event.getContentLength();
             try (var inputStream = buffer.getInputStream()) {
-                imageService.saveUploadedFile(filename, projectField.getValue().getId(), inputStream);
+
+                imageService.saveUploadedFile(filename, projectField.getValue().getId(), inputStream, contentType, contentLength);
                 imageGrid.getDataProvider().refreshAll();
                 Notification.show("Image " + filename + " uploaded!", 3000, Notification.Position.BOTTOM_END)
                         .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
@@ -426,4 +429,58 @@ public class ImageListView extends Main {
         dialog.add(new VerticalLayout(projectField, upload, closeBtn));
         dialog.open();
     }
+
+   /* private void openUploadDialogWithFile() {
+        Dialog dialog = new Dialog();
+        dialog.setHeaderTitle("Upload Image (JPEG, PNG, DICOM)");
+        dialog.setCloseOnEsc(true);
+        dialog.setCloseOnOutsideClick(true);
+
+        ComboBox<Project> projectField = new ComboBox<>("Project", projectService.findAllProjects());
+        projectField.setItemLabelGenerator(Project::getName);
+
+        MemoryBuffer buffer = new MemoryBuffer();
+        Upload upload = new Upload(buffer);
+        upload.setAcceptedFileTypes("image/jpeg", "image/png", ".dcm", "application/dicom", "application/octet-stream");
+
+        upload.addSucceededListener(event -> {
+            String filename = event.getFileName();
+            if (projectField.getValue() == null) {
+                Notification.show("Please select project first!", 3000, Notification.Position.MIDDLE)
+                        .addThemeVariants(NotificationVariant.LUMO_ERROR);
+                return;
+            }
+
+            String lowerFilename = filename.toLowerCase();
+            String contentType = event.getMIMEType();
+            long contentLength = event.getContentLength();
+
+            try (var inputStream = buffer.getInputStream()) {
+
+                if (lowerFilename.endsWith(".dcm") || contentType.equals("application/dicom") || contentType.equals("application/octet-stream")) {
+                    imageService.saveDicomFile(filename, projectField.getValue().getId(), inputStream);
+                    Notification.show("DICOM file " + filename + " uploaded!", 3000, Notification.Position.BOTTOM_END)
+                            .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+                } else {
+                    imageService.saveUploadedFile(filename, projectField.getValue().getId(), inputStream);
+                    Notification.show("Image " + filename + " uploaded!", 3000, Notification.Position.BOTTOM_END)
+                            .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+                }
+
+                imageGrid.getDataProvider().refreshAll();
+
+            } catch (Exception e) {
+                log.error("Upload failed: {}", e.getMessage(), e);
+                Notification.show("Upload failed!", 3000, Notification.Position.MIDDLE)
+                        .addThemeVariants(NotificationVariant.LUMO_ERROR);
+            }
+        });
+
+        Button closeBtn = new Button("Close", e -> dialog.close());
+        closeBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
+
+        dialog.add(new VerticalLayout(projectField, upload, closeBtn));
+        dialog.open();
+    }
+*/
 }

@@ -60,7 +60,6 @@ WHERE (:projectFilter IS NULL OR i.project = :projectFilter)
     List<ImageData> findImagesWithoutParentByProjects(@Param("projects") List<Project> projects);
 
 
-    Optional<ImageData> findByFileHash(String fileHash);
-
+    Optional<ImageData> findTop1ByProject_IdAndFileHashOrderByUploadDateDesc(Long projectId, String fileHash);
     }
 
