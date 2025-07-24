@@ -4,6 +4,7 @@ import kz.moon.app.seclevel.domain.User;
 import kz.moon.app.seclevel.model.ClassifierCategory;
 import kz.moon.app.seclevel.model.ImageData;
 import kz.moon.app.seclevel.model.Project;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -61,5 +62,18 @@ WHERE (:projectFilter IS NULL OR i.project = :projectFilter)
 
 
     Optional<ImageData> findTop1ByProject_IdAndFileHashOrderByUploadDateDesc(Long projectId, String fileHash);
-    }
+
+
+    @Query("""
+SELECT i FROM ImageData i
+WHERE (:projectFilter IS NULL OR i.project = :projectFilter)
+  AND (:statusFilter IS NULL OR i.status = :statusFilter)
+""")
+    Page<ImageData> findByProjectPaged(
+            @Param("projectFilter") Project projectFilter,
+            @Param("statusFilter") ImageStatus statusFilter,
+            Pageable pageable
+    );
+
+}
 

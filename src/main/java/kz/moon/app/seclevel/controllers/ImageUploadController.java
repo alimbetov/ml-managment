@@ -1,6 +1,8 @@
 package kz.moon.app.seclevel.controllers;
 
 
+import kz.moon.app.seclevel.dto.ClassifierCategoryDto;
+import kz.moon.app.seclevel.dto.ExportFilesDTO;
 import kz.moon.app.seclevel.model.ImageAnnotation;
 import kz.moon.app.seclevel.model.ImageData;
 
@@ -9,18 +11,19 @@ import kz.moon.app.seclevel.repository.ImageAnnotationRepository;
 import kz.moon.app.seclevel.repository.ImageRepository;
 import kz.moon.app.seclevel.repository.ImageStatus;
 
-import kz.moon.app.seclevel.services.ImageService;
-import kz.moon.app.seclevel.services.MinioService;
-import kz.moon.app.seclevel.services.ProjectService;
+import kz.moon.app.seclevel.services.*;
 import kz.moon.app.seclevel.utils.FileHashUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.InputStreamResource;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Slice;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -113,6 +116,23 @@ public class ImageUploadController {
 
         return image;
     }
+
+
+    @GetMapping("/projects/{projectId}/images")
+    public Page<ExportFilesDTO> getImagesByProjectPaged(
+            @PathVariable Long projectId,
+            @RequestParam(defaultValue = "UPLOADED") String status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "100") int size
+    ) {
+        Project project = projectService.getProject(projectId)
+                .orElseThrow(() -> new IllegalArgumentException("Project not found"));
+        ImageStatus imageStatus = ImageStatus.fromStringSafe(status)
+                .orElseThrow(() -> new IllegalArgumentException("Unknown status: " + status));
+
+        return imageService.getImagesByProjectPaged(project, imageStatus, page, size);
+    }
+
 
 
 }

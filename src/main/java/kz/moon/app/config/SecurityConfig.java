@@ -1,5 +1,6 @@
 package kz.moon.app.config;
 
+import kz.moon.app.seclevel.domain.RolesEnum;
 import kz.moon.app.seclevel.services.MyUserDetailsService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -31,6 +32,7 @@ public class SecurityConfig {
                                 "/manifest.webmanifest", "/sw.js", "/offline.html"
                         ).permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/api/classifier/**").hasRole("MARKER")
                         .anyRequest().authenticated()
                 )
 

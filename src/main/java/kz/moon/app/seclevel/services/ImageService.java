@@ -4,16 +4,16 @@ import com.vaadin.flow.server.StreamResource;
 import jakarta.annotation.Nullable;
 import jakarta.validation.constraints.NotNull;
 import kz.moon.app.seclevel.domain.User;
+import kz.moon.app.seclevel.dto.ExportFilesDTO;
+import kz.moon.app.seclevel.mapers.ExportFilesMapper;
 import kz.moon.app.seclevel.model.ClassifierCategory;
 import kz.moon.app.seclevel.model.ImageAnnotation;
 import kz.moon.app.seclevel.model.ImageData;
 import kz.moon.app.seclevel.repository.*;
 import kz.moon.app.seclevel.model.Project;
 import kz.moon.app.seclevel.utils.FileHashUtil;
+import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 
 
 import java.io.InputStream;
@@ -294,5 +294,15 @@ public class ImageService {
     }
 
 
+    public Page<ExportFilesDTO> getImagesByProjectPaged(
+            Project project,
+            ImageStatus statusFilter,
+            int page,
+            int size
+    ) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("uploadDate").descending());
+        Page<ImageData> imagePage = imageRepository.findByProjectPaged(project, statusFilter, pageable);
+        return imagePage.map(ExportFilesMapper::toDto);
+    }
 
 }

@@ -1,5 +1,7 @@
 package kz.moon.app.seclevel.services;
 
+import kz.moon.app.seclevel.dto.ClassifierCategoryDto;
+import kz.moon.app.seclevel.mapers.ClassifierCategoryMapper;
 import kz.moon.app.seclevel.model.ClassifierCategory;
 import kz.moon.app.seclevel.model.Classifier;
 import kz.moon.app.seclevel.model.Project;
@@ -68,5 +70,12 @@ public class ClassifierCategoryService {
     public  List<ClassifierCategory> getAllClassifierCategoryByProjectIn(List<Project> projects){
         return categoryRepository.findAllByProjectIn(projects);
     }
+
+    public List<ClassifierCategoryDto> getCategoryDtosByProjects(List<Project> projects) {
+        return categoryRepository.findAllByProjectIn(projects).stream()
+                .map(ClassifierCategoryMapper::toDto)
+                .toList();
+    }
+
 
 }

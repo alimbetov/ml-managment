@@ -1,5 +1,7 @@
 package kz.moon.app.seclevel.repository;
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 
 public enum ImageStatus {
@@ -24,6 +26,12 @@ public enum ImageStatus {
             }
         }
         return Optional.empty();
+    }
+
+    public static List<String> allNamesList() {
+        return Arrays.stream(ImageStatus.values())
+                .map(Enum::name)
+                .toList(); // Java 16+, для более старых — .collect(Collectors.toList())
     }
 
 }
